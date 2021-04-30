@@ -1,0 +1,507 @@
+---
+title: "Example Application: Modelling Changing Retrieval Performance in Empirical Data"
+author: "Maarten van der Velde"
+date: "Last updated: `r Sys.Date()`"
+output:
+  html_notebook:
+    smart: no
+    toc: yes
+    toc_float: yes
+  github_document:
+    toc: yes
+editor_options: 
+  chunk_output_type: inline
+---
+
+
+
+# Overview
+
+In this analysis, we model changes in retrieval performance between three retrieval practice sessions.
+First, we analyse behavioural measures (RT and accuracy).
+Then. we fit the LBA to the data, convert the resulting LBA parameters to ACT-R parameters, and analyse those parameter estimates.
+
+
+# Setup
+```{r}
+library(dplyr)
+library(ggplot2)
+library(rtdists)
+library(purrr)
+library(furrr)
+library(tidyr)
+library(truncdist)
+library(cowplot)
+library(grid)
+library(rlang)
+library(lme4)
+library(lmerTest)
+
+future::plan("multiprocess", workers = 6) # Set to desired number of cores
+
+theme_paper <- theme_classic(base_size = 14) + 
+  theme(axis.text = element_text(colour = "black"))
+
+
+use_cached_results <- TRUE # Set to FALSE to rerun simulations (takes time!)
+
+set.seed(2021)
+```
+
+## Parameter recovery functions
+
+Define the objective function to minimise (adapted to lognormal distribution from the [rtdists example](https://github.com/rtdists/rtdists/blob/master/examples/examples.lba.R)):
+```{r}
+obj_fun <- function(par, rt, response, distribution = "lnorm") {
+  # simple parameters
+  spar <- par[!grepl("[12]$", names(par))]  
+  
+  # distribution parameters:
+  dist_par_names <- unique(sub("[12]$", "", grep("[12]$" ,names(par), value = TRUE)))
+  dist_par <- vector("list", length = length(dist_par_names))
+  names(dist_par) <- dist_par_names
+  for (i in dist_par_names) dist_par[[i]] <- as.list(unname(par[grep(i, names(par))]))
+  dist_par$sdlog_v <- c(1, dist_par$sdlog_v) # fix first sdlog_v to 1
+
+  # get summed log-likelihood:
+  d <- do.call(dLBA, args = c(rt=list(rt), response=list(response), spar, dist_par, 
+                               distribution=distribution, silent=TRUE))
+  if (any(d < 0e-10)) return(1e6) 
+  else return(-sum(log(d)))
+}
+```
+
+Define the parameter recovery function, which randomly initialises the LBA parameters (within some reasonable constraints to promote convergence) and then uses the nlminb optimiser to find the best fit, evaluating each iteration with the objective function:
+```{r}
+recover_parameters <- function(data, obj_fun) {
+  
+  # Generate random starting values
+  init_par <- runif(6)
+  init_par[2] <- init_par[2] + 1 # Ensure b is larger than A
+  init_par[3] <- runif(1, 0, min(data$rt)) # Ensure t0 is mot too large
+  init_par[4] <- -init_par[4] # Ensure meanlog_v1 is negative
+  init_par[5] <- init_par[4] - init_par[5] # Ensure meanlog_v2 is negative and lower than meanlog_v2
+  names(init_par) <- c("A", "b", "t0", "meanlog_v1", "meanlog_v2", "sdlog_v2")
+  
+  # Run optimiser
+  fit <- nlminb(obj_fun,
+                start = init_par, 
+                rt = data$rt, response = data$response,
+                lower = c(0, 0, 0, -Inf, -Inf, 0)) # Set lower bounds on parameters
+  
+  # Only keep parameter estimates if the optimiser converged successfully
+  if (fit$convergence == 0 && !is.infinite(fit$objective)) {
+    return(as.list(c(fit$par, objective = fit$objective)))
+  }
+  
+  return(NULL)
+  
+}
+```
+
+
+## Prepare data
+
+We'll clean the data by removing study trials, trials in which no response was recorded, and trials with an RT lower than 300 ms.
+To give the model a chance of fitting the RT distributions, we'll also require that participants completed at least 50 trials and made at least 5 errors in each of the three sessions.
+```{r}
+d <- read.csv(file.path("..", "data", "data.csv")) %>%
+  filter(study == FALSE,
+         !is.infinite(rt),
+         rt >= 300) %>%
+  transmute(participant = as.character(subject),
+            list = case_when( # Simplify list names
+              list == "2019-09_1" ~ 1,
+              list == "2019-09_2" ~ 2,
+              list == "2019-09_3" ~ 3,
+              list == "2021-03_1" ~ 1,
+              list == "2021-03_2" ~ 2,
+              list == "2021-03_3" ~ 3
+            ),
+            trial_index,
+            rt = rt / 1000,
+            response = ifelse(correct == TRUE, 1, 2)
+  )
+
+# Total number of participants
+length(unique(d$participant))
+
+# Full dataset size
+nrow(d)
+
+min_trials <- 50
+min_errors <- 5
+
+d <- d %>%
+  group_by(participant, list) %>%
+  filter(n() > min_trials) %>%
+  filter(length(response[response == 2]) > min_errors) %>%
+  group_by(participant) %>%
+  filter(length(unique(list)) == 3)
+
+# Number of included participants
+length(unique(d$participant))
+
+# Number of included trials
+nrow(d)
+```
+
+Number of trials per participant, per list:
+```{r}
+d %>%
+  group_by(participant, list) %>%
+  tally() %>%
+  pull(n) %>%
+  summary()
+```
+
+# Behavioural results
+
+Plot accuracy and RT on correct responses:
+```{r}
+p_acc <- d %>%
+  mutate(correct = response == 1) %>%
+  group_by(participant, list) %>%
+  summarise(accuracy = mean(correct)) %>%
+  mutate(list_jitter = jitter(list, .4)) %>%
+  ggplot(aes(x = list_jitter, y = accuracy, group = participant)) +
+  geom_line(colour = "#78B7C5", alpha = .25) +
+  geom_point(colour = "#3B9AB2", alpha = .8, size = .8) +
+  geom_boxplot(aes(x = list, group = list), width = .2, colour = "black", outlier.shape = NA, fill = NA) +
+  scale_x_continuous(breaks = c(1, 2, 3)) +
+  scale_y_continuous(limits = c(.4, 1), labels = scales::percent_format(accuracy = 1)) +
+  labs(x = "Session",
+       y = NULL,
+       title = "Accuracy") +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme(plot.title = element_text(hjust = .5, size = rel(1)))
+
+p_acc
+```
+
+```{r}
+p_rt <- d %>%
+  filter(response == 1) %>%
+  group_by(participant, list) %>%
+  summarise(rt = median(rt)) %>%
+  mutate(list_jitter = jitter(list, .4)) %>%
+  ggplot(aes(x = list_jitter, y = rt, group = participant)) +
+  geom_line(colour = "#78B7C5", alpha = .25) +
+  geom_point(colour = "#3B9AB2", alpha = .8, size = .8) +
+  geom_boxplot(aes(x = list, group = list), width = .2, colour = "black", outlier.shape = NA, fill = NA) +
+  scale_x_continuous(breaks = c(1, 2, 3)) +
+  scale_y_continuous(limits = c(1.75, 5)) +
+  labs(x = "Session",
+       y = NULL,
+       title = "RT (s)") +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme(plot.title = element_text(hjust = .5, size = rel(1)))
+
+p_rt
+```
+
+
+```{r}
+plot_grid(p_acc, p_rt,
+          align = "hv",
+          axis = "tblr",
+          labels = "AUTO")
+
+ggsave(file.path("..", "output", "real_data.pdf"), width = 4.5, height = 3)
+```
+
+Do accuracy and RT change from session to session?
+```{r}
+m_acc <- glmer(correct ~ session + (1 | participant),
+               data = mutate(d, 
+                             correct = response == 1,
+                             session = factor(list, levels = c(2, 1, 3))),
+               family = binomial)
+
+summary(m_acc)
+```
+Yes, accuracy increases from session 1 to session 2, but there's no evidence of change from session 2 to session 3.
+
+```{r}
+m_rt <- glmer(rt ~ session + (1 | participant),
+              data = mutate(d,
+                            session = factor(list, levels = c(2, 1, 3))),
+              family = Gamma(link = "identity"))
+
+summary(m_rt)
+```
+RT decreases from session 1 to session 2, and from session 2 to session 3.
+
+
+# Infer parameters from data
+
+```{r message = FALSE, warning = FALSE}
+lists <- unique(d$list)
+participants <- unique(d$participant)
+
+if (use_cached_results) {
+  
+  param_infer_best <- readRDS(file.path("..", "output", "param_infer_best.rds"))
+  
+} else {
+  
+  n_attempts <- 250
+  param_infer <- list()
+  
+  for(i in 1:length(participants)) {
+    for(j in 1:length(lists)) {
+      param_infer <- append(param_infer,
+                            list(future_map_dfr(1:n_attempts, function(x) {
+                              recover_parameters(data = filter(d,
+                                                               participant == participants[i],
+                                                               list == lists[j]),
+                                                 obj_fun = obj_fun)
+                            }) %>%
+                              mutate(participant = participants[i],
+                                     list = lists[j])
+                            )
+      )
+    }
+  }
+  
+  param_infer <- bind_rows(param_infer)
+  
+  saveRDS(param_infer, file.path("..", "output", "param_infer.rds"))
+  
+  # Only keep the best fit across all attempts, which is closest to the global optimum:
+  param_infer_best <- param_infer %>%
+    group_by(participant, list) %>%
+    filter(objective == min(objective)) %>%
+    slice(n()) %>% # If there are multiple rows with the exact same value, only keep the first
+    ungroup()
+
+  saveRDS(param_infer_best, file.path("..", "output", "param_infer_best.rds"))
+  
+  
+}
+```
+
+
+
+```{r}
+dlba_dat <- crossing(participant = participants,
+                     list = lists,
+                     rt = seq(0, 20, by = .1),
+                     response = c(1, 2))
+
+sim_lba <- param_infer_best %>%
+  split(list(.$participant, .$list), drop = TRUE) %>%
+  future_map_dfr(function (x) {
+    bind_cols(filter(dlba_dat, participant == x$participant, list == x$list),
+              density = dLBA(rt = filter(dlba_dat, participant == x$participant, list == x$list)$rt,
+                             response = filter(dlba_dat, participant == x$participant, list == x$list)$response,
+                             A = x$A,
+                             b = x$b,
+                             t0 = x$t0,
+                             meanlog_v = c(x$meanlog_v1, x$meanlog_v2),
+                             sdlog_v = c(1, x$sdlog_v2),
+                             distribution = "lnorm",
+                             silent = TRUE))
+  }) %>%
+  mutate(rt = ifelse(response == 1, rt, -rt),
+         model = "LBA")
+```
+
+## Visualise fit
+
+Plot LBA best fit over the distribution of the data from four participants:
+```{r}
+# Randomly sample 4 participants
+set.seed(2021)
+participant_sample <- sample(participants, 4)
+
+d_sample <- filter(d, participant %in% participant_sample)
+sim_lba_sample <- filter(sim_lba, participant %in% participant_sample)
+
+d_sample$participant <- factor(d_sample$participant, levels = participant_sample, labels = c("Participant 1", "Participant 2", "Participant 3", "Participant 4"))
+sim_lba_sample$participant <- factor(sim_lba_sample$participant, levels = participant_sample, labels = c("Participant 1", "Participant 2", "Participant 3", "Participant 4"))
+
+d_sample$list <- factor(d_sample$list, levels = c(1, 2, 3), labels = c("Session 1", "Session 2", "Session 3"))
+sim_lba_sample$list <- factor(sim_lba_sample$list, levels = c(1, 2, 3), labels = c("Session 1", "Session 2", "Session 3"))
+
+
+trial_counts <- d_sample %>%
+  group_by(participant, list, response) %>%
+  summarise(n = n()) %>%
+  group_by(participant, list) %>%
+  summarise(accuracy = n[response == 1]/sum(n),
+            n = sum(n)) %>%
+  mutate(label = paste0("n = ", n, "\n", prettyNum(accuracy*100, digits = 3), "% correct"))
+
+
+draw_key_custom <- function(data, params, size) {
+  if(data$colour == "#000000" && data$size == .1) { # Data
+    grobTree(
+      linesGrob(
+        c(.1, .1, .3, .3, .3, .5, .5, .5, .7, .7, .7, .9, .9),
+        c(0, .5, .5, 0, .8, .8, 0, .65, .65, 0, .4, .4, 0)
+      ),
+      gp = gpar(
+        col = data$colour %||% "grey20",
+        fill = alpha(data$fill %||% "white", data$alpha),
+        lwd = (data$size %||% 0.5) * .pt,
+        lty = data$linetype %||% 1
+      )
+    )
+  } 
+  else if (data$colour == "#e66101" && data$size == 1.1) { # LBA
+    grobTree(
+      linesGrob(
+        c(0, 1),
+        c(.5, .5)
+      ),
+      gp = gpar(
+        col = alpha(data$colour %||% "grey20", data$alpha),
+        fill = alpha(data$fill %||% "white", data$alpha),
+        lwd = (data$size %||% 0.5) * .pt,
+        lty = data$linetype %||% 1
+      )
+    )
+  }
+  else {
+    grobTree() # Don't draw
+  }
+}
+
+
+d_sample %>%
+  mutate(rt = ifelse(response == 1, rt, -rt),
+         model = "Data") %>%
+  ggplot(aes(x = rt, colour = model)) +
+  facet_grid(list ~ participant, drop = TRUE) +
+  geom_vline(xintercept = 0, lty = 2, colour = "grey80") +
+  geom_histogram(aes(y = ..density..), binwidth = 1, fill = "white", size = .1, key_glyph = draw_key_custom) +
+  geom_line(data = sim_lba_sample, aes(y = density), size = rel(1.1), alpha = .8, key_glyph = draw_key_custom) +
+  geom_text(data = trial_counts, aes(label = label), x = -20, y = .4, hjust = 0, colour = "black", size = rel(3), fontface = "italic") +
+  scale_x_continuous(limits = c(-20, 20), breaks = c(-15, 0, 15)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_colour_manual(values = c("#000000", "#e66101")) +
+  labs(x = "RT (s)",
+       y = "Density",
+       colour = NULL) +
+  theme_paper +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(size = rel(1)),
+        legend.background = element_blank(),
+        legend.position = "top",
+        legend.justification = "right",
+        legend.direction = "vertical",
+        legend.box.margin = unit(c(-20, -30, -20, 0), "pt"))
+
+
+ggsave(file.path("..", "output", "param_recov_real_dist.pdf"), width = 9, height = 5)
+```
+
+## Analyse ACT-R parameters
+
+Plot distribution of parameter estimates per session:
+```{r}
+param_labs <- c("expression(mu[c])", "expression(mu[f])", "expression(sigma[f])", "expression(F)", "expression(t[er])")
+names(param_labs) <- c("A_c", "A_f", "A_f_sd", "F", "t_er")
+
+
+param_infer_plotdat <- param_infer_best %>%
+  transmute(`F` = b - A/2,
+            A_c = meanlog_v1,
+            A_f = meanlog_v2,
+            A_f_sd = sdlog_v2,
+            t_er = t0,
+            participant,
+            list) %>%
+  pivot_longer(`F`:t_er, "parameter", "value") %>%
+  mutate(parameter = factor(parameter, 
+                            levels = c("A_c", "A_f", "A_f_sd", "F", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F), expression(t[er]))),
+         list_jitter = jitter(list, .4)) %>%
+  filter(participant %in% participants)
+
+
+param_infer_summary <- param_infer_plotdat %>%
+  group_by(parameter, list) %>%
+  summarise(median = median(value))
+
+
+ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
+  facet_wrap(~ parameter, ncol = 5, scales = "free_y", labeller = labeller(parameter = label_parsed))+
+  geom_line(alpha = .15) +
+  geom_point(alpha = .25) +
+  geom_line(data = param_infer_summary, aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
+  geom_point(data = param_infer_summary, aes(x = list, y = median, group = parameter), colour = "black", size = rel(2.5)) +
+  scale_x_continuous(breaks = c(1, 2, 3)) +
+  scale_colour_viridis_d() +
+  labs(x = "Session",
+       y = "Parameter value") +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size = rel(1)))
+
+ggsave(file.path("..", "output", "param_infer_real_values.pdf"), width = 9, height = 3)
+```
+
+
+Were there significant changes in parameters from session to session?
+
+```{r}
+param_infer_modeldat <- param_infer_plotdat %>%
+  mutate(session = factor(list, levels = c(2, 1, 3))) %>%
+  select(-list, -list_jitter) %>%
+  pivot_wider(names_from = "parameter", values_from = "value") %>%
+  mutate(mu_diff = `mu[c]` - `mu[f]`) %>%
+  pivot_longer(F:mu_diff, "parameter", "value")
+
+# Activation of correct answer
+m_mu_c <- lmer(value ~ session + (1 | participant),
+               data = filter(param_infer_modeldat, parameter == "mu[c]"))
+
+summary(m_mu_c)
+
+# Activation of incorrect answer
+m_mu_f <- lmer(value ~ session + (1 | participant),
+               data = filter(param_infer_modeldat, parameter == "mu[f]"))
+
+summary(m_mu_f)
+
+# Difference in activation
+m_mu_diff <- lmer(value ~ session + (1 | participant),
+                  data = filter(param_infer_modeldat, parameter == "mu_diff"))
+
+summary(m_mu_diff)
+
+# SD of activation of incorrect answer
+m_sigma_f <- lmer(value ~ session + (1 | participant),
+               data = filter(param_infer_modeldat, parameter == "sigma[f]"))
+
+summary(m_sigma_f)
+
+# Latency factor
+m_f <- lmer(value ~ session + (1 | participant),
+               data = filter(param_infer_modeldat, parameter == "F"))
+
+summary(m_f)
+
+# Non-retrieval time
+m_t_er <- lmer(value ~ session + (1 | participant),
+               data = filter(param_infer_modeldat, parameter == "t[er]"))
+
+summary(m_t_er)
+
+```
+
+
+
+# Session info
+```{r}
+sessionInfo()
+```
+
+
