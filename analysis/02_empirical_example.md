@@ -523,7 +523,7 @@ ggsave(file.path("..", "output", "param_recov_real_dist.pdf"), width = 9, height
     ## Warning: Removed 24 rows containing missing values.
 
 ``` r
-ggsave(file.path("..", "output", "param_recov_real_dist.png"), width = 9, height = 5, dpi = 600)
+ggsave(file.path("..", "output", "param_recov_real_dist.png"), width = 6.5, height = 4.25, dpi = 600)
 ```
 
     ## Warning: Removed 3 rows containing non-finite values (stat_bin).
@@ -581,7 +581,7 @@ ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant,
 
 ``` r
 ggsave(file.path("..", "output", "param_infer_real_values.pdf"), width = 9, height = 3)
-ggsave(file.path("..", "output", "param_infer_real_values.png"), width = 9, height = 3, dpi = 600)
+ggsave(file.path("..", "output", "param_infer_real_values.png"), width = 6.5, height = 2.5, dpi = 600)
 ```
 
 Were there significant changes in parameters from session to session?

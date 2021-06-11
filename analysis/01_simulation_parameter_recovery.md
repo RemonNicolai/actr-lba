@@ -493,7 +493,7 @@ tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd)
   facet_grid(parameter ~ ., scales = "free", switch = "y", labeller = labeller(parameter = label_parsed)) +
   # geom_boxplot(outlier.shape = NA) +
   geom_hline(aes(yintercept = parameter), colour = "grey90", lty = 3) +
-  geom_jitter(height = .1, width = 0) +
+  geom_jitter(height = .1, width = 0, size = .5) +
   labs(x = NULL,
        y = NULL) +
   guides(colour = FALSE) +
@@ -509,7 +509,7 @@ tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd)
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
 
 ``` r
-ggsave(file.path("..", "output", "sim-param-values.png"), width = 4.5, height = 4.5, dpi = 600)
+ggsave(file.path("..", "output", "sim-param-values.png"), width = 2, height = 2, dpi = 600)
 ```
 
 Generate the data:
@@ -675,7 +675,7 @@ ggplot(s3_par_comp_plot, aes(x = original, y = recovered)) +
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
 
 ``` r
-ggsave(file.path("..", "output", "param-recov-comparison.png"), width = 9, height = 3, dpi = 600)
+ggsave(file.path("..", "output", "param-recov-comparison.png"), width = 6.5, height = 3, dpi = 600)
 ```
 
 Compare fitted LBA density to data:
@@ -771,14 +771,14 @@ draw_key_custom <- function(data, params, size) {
 
 
 sim_actr %>%
-  filter(participant < 10) %>%
+  filter(participant <= 3) %>%
   mutate(rt = ifelse(response == 1, rt, -rt),
          model = "ACT-R") %>%
   ggplot(aes(x = rt, colour = model)) +
-  facet_wrap(~ participant, ncol = 3) +
+  facet_wrap(~ participant, ncol = 1) +
   geom_vline(xintercept = 0, lty = 2, colour = "grey80") +
   geom_histogram(aes(y = ..density..), binwidth = .5, fill = "white", size = .1, key_glyph = draw_key_custom) +
-  geom_line(data = filter(sim_lba, participant < 10), aes(y = density), key_glyph = draw_key_custom) +
+  geom_line(data = filter(sim_lba, participant <= 3), aes(y = density), key_glyph = draw_key_custom) +
   scale_x_continuous(limits = c(-20, 20), breaks = c(-15, 0, 15)) +
   scale_y_continuous(expand = c(0, 0)) +
   scale_colour_manual(values = c("#000000", "#e66101")) +
@@ -792,24 +792,20 @@ sim_actr %>%
         strip.text = element_blank(),
         # legend.background = element_blank(),
         legend.position = "top",
-        legend.justification = "right",
+        legend.justification = "left",
         legend.direction = "vertical",
-        legend.box.margin = unit(c(-20, 0, -40, 0), "pt"))
+        legend.box.margin = unit(c(-20, 0, -40, -30), "pt"))
 ```
 
-    ## Warning: Removed 1 rows containing non-finite values (stat_bin).
-
-    ## Warning: Removed 18 rows containing missing values.
+    ## Warning: Removed 6 rows containing missing values.
 
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
 
 ``` r
-ggsave(file.path("..", "output", "param-recov-dist-comp.png"), width = 4.5, height = 4.5, dpi = 600)
+ggsave(file.path("..", "output", "param-recov-dist-comp.png"), width = 1.75, height = 3, dpi = 600)
 ```
 
-    ## Warning: Removed 1 rows containing non-finite values (stat_bin).
-    
-    ## Warning: Removed 18 rows containing missing values.
+    ## Warning: Removed 6 rows containing missing values.
 
 # Simulation 4: multiple participants, vary dataset size
 
