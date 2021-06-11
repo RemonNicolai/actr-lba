@@ -281,8 +281,9 @@ ggsave(file.path("..", "output", "sim-actr-combi.pdf"), width = 9, height = 3)
 
 Make separate PNGs for in the presentation:
 ```{r}
-ggsave(plot = p_actr_lba, filename = file.path("..", "output", "sim-actr-presentation.png"), width = 4.5, height = 3)
-ggsave(plot = p_rt_comp, filename = file.path("..", "output", "sim-rt-comparison-presentation.png"), width = 4.5, height = 3)
+ggsave(plot = p_actr_lba, filename = file.path("..", "output", "sim-actr-presentation.png"), width = 4.5, height = 3, dpi = 600)
+
+ggsave(plot = p_rt_comp, filename = file.path("..", "output", "sim-rt-comparison-presentation.png"), width = 4.5, height = 3, dpi = 600)
 ```
 
 

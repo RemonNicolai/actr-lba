@@ -1,7 +1,7 @@
 Extra visualisations of the mapping between ACT-R and LBA
 ================
 Maarten van der Velde
-Last updated: 2021-04-30
+Last updated: 2021-06-11
 
 ## Background
 
@@ -290,6 +290,19 @@ plot_grid(p_actr_lba, p_rt_comp,
 ggsave(file.path("..", "output", "sim-actr-combi.pdf"), width = 9, height = 3)
 ```
 
+Make separate PNGs for in the
+presentation:
+
+``` r
+ggsave(plot = p_actr_lba, filename = file.path("..", "output", "sim-actr-presentation.png"), width = 4.5, height = 3, dpi = 600)
+
+ggsave(plot = p_rt_comp, filename = file.path("..", "output", "sim-rt-comparison-presentation.png"), width = 4.5, height = 3, dpi = 600)
+```
+
+    ## Warning: Removed 1227 rows containing non-finite values (stat_bin).
+
+    ## Warning: Removed 2 rows containing missing values.
+
 # Session info
 
 ``` r
@@ -328,7 +341,7 @@ sessionInfo()
     ## [13] pkgconfig_2.0.2   Matrix_1.2-18     yaml_2.2.0       
     ## [16] mvtnorm_1.1-1     expm_0.999-4      xfun_0.21        
     ## [19] withr_2.3.0       stringr_1.4.0     knitr_1.23       
-    ## [22] vctrs_0.2.2       tidyselect_0.2.5  glue_1.3.1       
+    ## [22] vctrs_0.3.8       tidyselect_1.1.1  glue_1.3.1       
     ## [25] R6_2.4.0          survival_2.44-1.1 rmarkdown_2.6    
     ## [28] purrr_0.3.2       magrittr_1.5      scales_1.0.0     
     ## [31] htmltools_0.3.6   splines_3.6.3     assertthat_0.2.1 

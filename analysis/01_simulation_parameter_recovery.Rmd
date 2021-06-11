@@ -445,7 +445,7 @@ tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd)
         axis.ticks.y = element_blank(),
         axis.line.y = element_blank())
 
-ggsave(file.path("..", "output", "sim-param-values.png"), width = 4.5, height = 4.5)
+ggsave(file.path("..", "output", "sim-param-values.png"), width = 4.5, height = 4.5, dpi = 600)
 ```
 
 Generate the data:
@@ -582,7 +582,7 @@ ggplot(s3_par_comp_plot, aes(x = original, y = recovered)) +
   theme(strip.background = element_blank(),
         strip.text = element_text(size = rel(1)))
 
-ggsave(file.path("..", "output", "param-recov-comparison.png"), width = 9, height = 3)
+ggsave(file.path("..", "output", "param-recov-comparison.png"), width = 9, height = 3, dpi = 600)
 ```
 
 
@@ -699,7 +699,7 @@ sim_actr %>%
         legend.direction = "vertical",
         legend.box.margin = unit(c(-20, 0, -40, 0), "pt"))
 
-ggsave(file.path("..", "output", "param-recov-dist-comp.png"), width = 4.5, height = 4.5)
+ggsave(file.path("..", "output", "param-recov-dist-comp.png"), width = 4.5, height = 4.5, dpi = 600)
 ```
 
 
@@ -904,7 +904,7 @@ ggplot() +
         legend.justification = "right",
         legend.box.margin = unit(c(0, 0, -40, 0), "pt"))
 
-ggsave(file.path("..", "output", "param-recov-multi-error.png"), width = 6, height = 3)
+ggsave(file.path("..", "output", "param-recov-multi-error.png"), width = 6, height = 3, dpi = 600)
 ```
 
 

@@ -2,7 +2,7 @@ Example Application: Modelling Changing Retrieval Performance in
 Empirical Data
 ================
 Maarten van der Velde
-Last updated: 2021-06-09
+Last updated: 2021-06-11
 
 # Overview
 
@@ -237,6 +237,20 @@ plot_grid(p_acc, p_rt,
 
 ``` r
 ggsave(file.path("..", "output", "real_data.pdf"), width = 4.5, height = 3)
+```
+
+Presentation version:
+
+``` r
+plot_grid(p_acc, p_rt,
+          align = "hv",
+          axis = "tblr")
+```
+
+![](02_empirical_example_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "real_data.png"), width = 4.5, height = 3, dpi = 600)
 ```
 
 Do accuracy and RT change from session to session?
@@ -498,10 +512,18 @@ d_sample %>%
 
     ## Warning: Removed 24 rows containing missing values.
 
-![](02_empirical_example_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](02_empirical_example_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param_recov_real_dist.pdf"), width = 9, height = 5)
+```
+
+    ## Warning: Removed 3 rows containing non-finite values (stat_bin).
+    
+    ## Warning: Removed 24 rows containing missing values.
+
+``` r
+ggsave(file.path("..", "output", "param_recov_real_dist.png"), width = 9, height = 5, dpi = 600)
 ```
 
     ## Warning: Removed 3 rows containing non-finite values (stat_bin).
@@ -555,10 +577,11 @@ ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant,
         strip.text = element_text(size = rel(1)))
 ```
 
-![](02_empirical_example_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
+![](02_empirical_example_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param_infer_real_values.pdf"), width = 9, height = 3)
+ggsave(file.path("..", "output", "param_infer_real_values.png"), width = 9, height = 3, dpi = 600)
 ```
 
 Were there significant changes in parameters from session to session?

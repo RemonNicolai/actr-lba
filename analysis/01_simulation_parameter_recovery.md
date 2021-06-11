@@ -509,7 +509,7 @@ tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd)
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
 
 ``` r
-ggsave(file.path("..", "output", "sim-param-values.png"), width = 4.5, height = 4.5)
+ggsave(file.path("..", "output", "sim-param-values.png"), width = 4.5, height = 4.5, dpi = 600)
 ```
 
 Generate the data:
@@ -675,7 +675,7 @@ ggplot(s3_par_comp_plot, aes(x = original, y = recovered)) +
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
 
 ``` r
-ggsave(file.path("..", "output", "param-recov-comparison.png"), width = 9, height = 3)
+ggsave(file.path("..", "output", "param-recov-comparison.png"), width = 9, height = 3, dpi = 600)
 ```
 
 Compare fitted LBA density to data:
@@ -804,7 +804,7 @@ sim_actr %>%
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
 
 ``` r
-ggsave(file.path("..", "output", "param-recov-dist-comp.png"), width = 4.5, height = 4.5)
+ggsave(file.path("..", "output", "param-recov-dist-comp.png"), width = 4.5, height = 4.5, dpi = 600)
 ```
 
     ## Warning: Removed 1 rows containing non-finite values (stat_bin).
@@ -1036,7 +1036,7 @@ ggplot() +
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-40-1.png)<!-- -->
 
 ``` r
-ggsave(file.path("..", "output", "param-recov-multi-error.png"), width = 6, height = 3)
+ggsave(file.path("..", "output", "param-recov-multi-error.png"), width = 6, height = 3, dpi = 600)
 ```
 
 Make the figure in the paper:

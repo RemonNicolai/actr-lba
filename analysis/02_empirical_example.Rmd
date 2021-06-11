@@ -218,7 +218,7 @@ plot_grid(p_acc, p_rt,
           align = "hv",
           axis = "tblr")
 
-ggsave(file.path("..", "output", "real_data.png"), width = 4.5, height = 3)
+ggsave(file.path("..", "output", "real_data.png"), width = 4.5, height = 3, dpi = 600)
 ```
 
 
@@ -410,7 +410,7 @@ d_sample %>%
 
 
 ggsave(file.path("..", "output", "param_recov_real_dist.pdf"), width = 9, height = 5)
-ggsave(file.path("..", "output", "param_recov_real_dist.png"), width = 9, height = 5)
+ggsave(file.path("..", "output", "param_recov_real_dist.png"), width = 9, height = 5, dpi = 600)
 ```
 
 ## Analyse ACT-R parameters
@@ -458,7 +458,7 @@ ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant,
         strip.text = element_text(size = rel(1)))
 
 ggsave(file.path("..", "output", "param_infer_real_values.pdf"), width = 9, height = 3)
-ggsave(file.path("..", "output", "param_infer_real_values.png"), width = 9, height = 3)
+ggsave(file.path("..", "output", "param_infer_real_values.png"), width = 9, height = 3, dpi = 600)
 ```
 
 
