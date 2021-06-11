@@ -2,7 +2,7 @@ Example Application: Modelling Changing Retrieval Performance in
 Empirical Data
 ================
 Maarten van der Velde
-Last updated: 2021-04-30
+Last updated: 2021-06-09
 
 # Overview
 
@@ -831,9 +831,9 @@ sessionInfo()
     ## [13] ggplot2_3.3.2   dplyr_0.8.3    
     ## 
     ## loaded via a namespace (and not attached):
-    ##  [1] tidyselect_0.2.5    xfun_0.21           listenv_0.7.0      
+    ##  [1] tidyselect_1.1.1    xfun_0.21           listenv_0.7.0      
     ##  [4] splines_3.6.3       lattice_0.20-41     colorspace_1.4-1   
-    ##  [7] vctrs_0.2.2         expm_0.999-4        viridisLite_0.3.0  
+    ##  [7] vctrs_0.3.8         expm_0.999-4        viridisLite_0.3.0  
     ## [10] htmltools_0.3.6     yaml_2.2.0          survival_2.44-1.1  
     ## [13] nloptr_1.2.1        pillar_1.4.2        glue_1.3.1         
     ## [16] withr_2.3.0         lifecycle_0.1.0     stringr_1.4.0      

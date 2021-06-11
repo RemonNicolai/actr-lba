@@ -1,7 +1,7 @@
 Simulation: Recovering ACT-R parameters using the LBA
 ================
 Maarten van der Velde
-Last updated: 2021-04-30
+Last updated: 2021-06-11
 
 # Overview
 
@@ -33,6 +33,9 @@ library(furrr)
 library(tidyr)
 library(truncdist)
 library(cowplot)
+library(grid)
+library(rlang)
+
 future::plan("multiprocess", workers = 6) # Set to desired number of cores
 
 theme_paper <- theme_classic(base_size = 14) + 
@@ -477,6 +480,38 @@ tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd)
 
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
+Alternative
+visualisation:
+
+``` r
+tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd) %>%
+  pivot_longer(-participant, "parameter") %>%
+  mutate(parameter = factor(parameter, 
+                            levels = c("a_c_mu", "a_f_mu", "a_c_sd", "a_f_sd", "lf", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[c]), expression(sigma[f]), expression(F), expression(t[er])))) %>%
+  ggplot(aes(y = parameter, x = value, colour = (parameter))) +
+  facet_grid(parameter ~ ., scales = "free", switch = "y", labeller = labeller(parameter = label_parsed)) +
+  # geom_boxplot(outlier.shape = NA) +
+  geom_hline(aes(yintercept = parameter), colour = "grey90", lty = 3) +
+  geom_jitter(height = .1, width = 0) +
+  labs(x = NULL,
+       y = NULL) +
+  guides(colour = FALSE) +
+  scale_colour_viridis_d() +
+  theme_paper +
+  theme(strip.background = element_blank(),
+        strip.text.y.left = element_text(angle = 0, size = rel(1.25)),
+        axis.text.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        axis.line.y = element_blank())
+```
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "sim-param-values.png"), width = 4.5, height = 4.5)
+```
+
 Generate the data:
 
 ``` r
@@ -499,12 +534,12 @@ head(sim_actr)
     ## # A tibble: 6 x 7
     ##   participant     f    a_c    a_f     t    rt response
     ##         <int> <dbl>  <dbl>  <dbl> <dbl> <dbl>    <dbl>
-    ## 1           1 0.955  0.730 -2.06   1.45  1.91        1
-    ## 2           1 0.955 -1.35  -1.67   1.45  5.14        1
-    ## 3           1 0.955 -1.34  -3.16   1.45  5.09        1
-    ## 4           1 0.955 -0.433 -2.84   1.45  2.92        1
-    ## 5           1 0.955 -2.18  -3.18   1.45  9.91        1
-    ## 6           1 0.955  0.932 -0.832  1.45  1.82        1
+    ## 1           1 0.955 -1.35  -1.67   1.45  5.14        1
+    ## 2           1 0.955 -1.34  -3.16   1.45  5.09        1
+    ## 3           1 0.955 -0.433 -2.84   1.45  2.92        1
+    ## 4           1 0.955 -2.18  -3.18   1.45  9.91        1
+    ## 5           1 0.955  0.932 -0.832  1.45  1.82        1
+    ## 6           1 0.955 -0.788 -1.82   1.45  3.54        1
 
 ``` r
 prop.table(table(sim_actr$response))
@@ -532,7 +567,7 @@ ggplot(mutate(sim_actr, rt = ifelse(response == 1, rt, -rt)), aes(x = rt, group 
         strip.text = element_blank())
 ```
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-25-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
 
 ## Recover parameters
 
@@ -614,7 +649,34 @@ p_par_comp <- ggplot(s3_par_comp_plot, aes(x = original, y = recovered)) +
 p_par_comp
 ```
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-28-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-29-1.png)<!-- -->
+
+Alternative plot:
+
+``` r
+ggplot(s3_par_comp_plot, aes(x = original, y = recovered)) +
+  facet_wrap(~ parameter, ncol = 5, labeller = labeller(parameter = label_parsed))+
+  geom_abline(lty = 2, colour = "grey80") +
+  geom_smooth(method = "lm", formula = y ~ x, alpha = .5, colour = "black", lwd = rel(.8)) +
+  geom_point(aes(colour = parameter), alpha = .5) +
+  coord_fixed() +
+  labs(x = "Original",
+         y = "Recovered",
+         colour = NULL) +
+  scale_x_continuous(limits = c(min(s3_par_comp$recovered), max(s3_par_comp$recovered))) +
+  scale_colour_viridis_d() +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme_paper +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size = rel(1)))
+```
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "param-recov-comparison.png"), width = 9, height = 3)
+```
 
 Compare fitted LBA density to data:
 
@@ -668,7 +730,86 @@ sim_actr %>%
 
     ## Warning: Removed 50 rows containing missing values (geom_bar).
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-32-1.png)<!-- -->
+
+Alternative plot for presentation:
+
+``` r
+draw_key_custom <- function(data, params, size) {
+  if(data$colour == "#000000" && data$size == .1) { # ACT-R
+    grobTree(
+      linesGrob(
+        c(.1, .1, .3, .3, .3, .5, .5, .5, .7, .7, .7, .9, .9),
+        c(0, .5, .5, 0, .8, .8, 0, .65, .65, 0, .4, .4, 0)
+      ),
+      gp = gpar(
+        col = data$colour %||% "grey20",
+        fill = alpha(data$fill %||% "white", data$alpha),
+        lwd = (data$size %||% 0.5) * .pt,
+        lty = data$linetype %||% 1
+      )
+    )
+  } 
+  else if (data$colour == "#e66101") { # LBA
+    grobTree(
+      linesGrob(
+        c(0, 1),
+        c(.5, .5)
+      ),
+      gp = gpar(
+        col = alpha(data$colour %||% "grey20", data$alpha),
+        fill = alpha(data$fill %||% "white", data$alpha),
+        lwd = (data$size %||% 0.5) * .pt,
+        lty = data$linetype %||% 1
+      )
+    )
+  }
+  else {
+    grobTree() # Don't draw
+  }
+}
+
+
+sim_actr %>%
+  filter(participant < 10) %>%
+  mutate(rt = ifelse(response == 1, rt, -rt),
+         model = "ACT-R") %>%
+  ggplot(aes(x = rt, colour = model)) +
+  facet_wrap(~ participant, ncol = 3) +
+  geom_vline(xintercept = 0, lty = 2, colour = "grey80") +
+  geom_histogram(aes(y = ..density..), binwidth = .5, fill = "white", size = .1, key_glyph = draw_key_custom) +
+  geom_line(data = filter(sim_lba, participant < 10), aes(y = density), key_glyph = draw_key_custom) +
+  scale_x_continuous(limits = c(-20, 20), breaks = c(-15, 0, 15)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_colour_manual(values = c("#000000", "#e66101")) +
+  labs(x = "RT (s)",
+       y = "Density",
+       colour = NULL) +
+  theme_paper +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_blank(),
+        # legend.background = element_blank(),
+        legend.position = "top",
+        legend.justification = "right",
+        legend.direction = "vertical",
+        legend.box.margin = unit(c(-20, 0, -40, 0), "pt"))
+```
+
+    ## Warning: Removed 1 rows containing non-finite values (stat_bin).
+
+    ## Warning: Removed 18 rows containing missing values.
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "param-recov-dist-comp.png"), width = 4.5, height = 4.5)
+```
+
+    ## Warning: Removed 1 rows containing non-finite values (stat_bin).
+    
+    ## Warning: Removed 18 rows containing missing values.
 
 # Simulation 4: multiple participants, vary dataset size
 
@@ -807,13 +948,17 @@ ggplot(s4_par_comp, aes(x = original, y = recovered, colour = parameter)) +
   theme_paper
 ```
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-35-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
 
 Difference between the original ACT-R parameters and the recovered
 parameter estimates from the LBA, as a function of datset size:
 
 ``` r
 s4_par_comp_error <- s4_par_comp %>%
+  filter(parameter != "A_correct_sd") %>%
+  mutate(parameter = factor(parameter, 
+                            levels = c("A_correct", "A_incorrect", "A_incorrect_sd", "F", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F), expression(t[er])))) %>%
   rowwise() %>%
   mutate(ae = abs(original - recovered)) %>%
   ungroup()
@@ -855,7 +1000,44 @@ p_par_comp_multi <- ggplot() +
 p_par_comp_multi
 ```
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-36-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-39-1.png)<!-- -->
+
+Make version with colour legend for presentation:
+
+``` r
+ggplot() +
+  geom_rect(aes(xmin = exp(log(100) - .25), xmax = exp(log(100) + .25), ymin = 0, ymax = 2), colour = NA, fill = "grey90") +
+  geom_jitter(data = s4_par_comp_error, aes(x = n, y = ae, colour = parameter), height = 0, width = .025, alpha = .05) +
+  geom_line(data = s4_par_comp_error_param, aes(x = n, y = mae, group = parameter, colour = parameter), lty = 2) +
+  geom_point(data = s4_par_comp_error_param, aes(x = n, y = mae, group = parameter, colour = parameter), alpha = .9) +
+  geom_line(data = s4_par_comp_error_mean, aes(x = n, y = mae), lty = 2, lwd = rel(.85)) +
+  geom_point(data = s4_par_comp_error_mean, aes(x = n, y = mae), size = rel(2)) +
+  scale_x_log10(breaks = c(25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000),
+                labels = c(25, 50, 100, 250, 500, "1K", "2.5K", "5K", "10K", "25K", "50K")) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_colour_viridis_d(labels = scales::parse_format()) +
+  coord_cartesian(ylim = c(0, 2)) +
+  labs(x = "Number of trials",
+       y = "Absolute error",
+       colour = NULL) +
+  # guides(colour = FALSE) +
+  theme_paper +
+  theme(axis.text.x = element_text(face = c("plain", "plain", "bold", "plain", "plain", "plain", "plain", "plain", "plain", "plain", "plain")),
+        legend.background = element_blank(),
+        legend.direction = "horizontal",
+        legend.position = "top",
+        legend.justification = "right",
+        legend.box.margin = unit(c(0, 0, -40, 0), "pt"))
+```
+
+    ## Warning: Vectorized input to `element_text()` is not officially supported.
+    ## Results may be unexpected or may change in future versions of ggplot2.
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-40-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "param-recov-multi-error.png"), width = 6, height = 3)
+```
 
 Make the figure in the paper:
 
@@ -866,7 +1048,7 @@ plot_grid(p_par_comp, p_par_comp_multi,
           labels = c("A", "B"))
 ```
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-37-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-41-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param_recov_multi_combi.pdf"), width = 9, height = 4.5)
@@ -895,30 +1077,28 @@ sessionInfo()
     ## [11] LC_MEASUREMENT=nl_NL.UTF-8 LC_IDENTIFICATION=C       
     ## 
     ## attached base packages:
-    ## [1] stats4    stats     graphics  grDevices utils     datasets  methods  
-    ## [8] base     
+    ## [1] grid      stats4    stats     graphics  grDevices utils     datasets 
+    ## [8] methods   base     
     ## 
     ## other attached packages:
-    ##  [1] cowplot_0.9.4   truncdist_1.0-2 evd_2.3-3       tidyr_1.0.0    
-    ##  [5] furrr_0.1.0     future_1.13.0   purrr_0.3.2     rtdists_0.11-2 
-    ##  [9] ggplot2_3.3.2   dplyr_0.8.3    
+    ##  [1] rlang_0.4.10    cowplot_0.9.4   truncdist_1.0-2 evd_2.3-3      
+    ##  [5] tidyr_1.0.0     furrr_0.1.0     future_1.13.0   purrr_0.3.2    
+    ##  [9] rtdists_0.11-2  ggplot2_3.3.2   dplyr_0.8.3    
     ## 
     ## loaded via a namespace (and not attached):
-    ##  [1] tidyselect_0.2.5  xfun_0.21         listenv_0.7.0    
+    ##  [1] tidyselect_1.1.1  xfun_0.21         listenv_0.7.0    
     ##  [4] splines_3.6.3     lattice_0.20-41   colorspace_1.4-1 
-    ##  [7] vctrs_0.2.2       expm_0.999-4      htmltools_0.3.6  
+    ##  [7] vctrs_0.3.8       expm_0.999-4      htmltools_0.3.6  
     ## [10] viridisLite_0.3.0 yaml_2.2.0        mgcv_1.8-28      
-    ## [13] utf8_1.1.4        survival_2.44-1.1 rlang_0.4.10     
-    ## [16] pillar_1.4.2      glue_1.3.1        withr_2.3.0      
-    ## [19] lifecycle_0.1.0   stringr_1.4.0     munsell_0.5.0    
-    ## [22] gtable_0.3.0      mvtnorm_1.1-1     codetools_0.2-16 
-    ## [25] evaluate_0.14     labeling_0.3      knitr_1.23       
-    ## [28] parallel_3.6.3    fansi_0.4.0       Rcpp_1.0.6       
-    ## [31] scales_1.0.0      jsonlite_1.6      packrat_0.5.0    
-    ## [34] digest_0.6.19     stringi_1.4.3     msm_1.6.8        
-    ## [37] gsl_2.1-6         grid_3.6.3        cli_2.2.0        
-    ## [40] tools_3.6.3       magrittr_1.5      tibble_2.1.3     
-    ## [43] crayon_1.3.4      pkgconfig_2.0.2   Matrix_1.2-18    
-    ## [46] assertthat_0.2.1  rmarkdown_2.6     rstudioapi_0.13  
-    ## [49] R6_2.4.0          globals_0.12.4    nlme_3.1-149     
-    ## [52] compiler_3.6.3
+    ## [13] utf8_1.1.4        survival_2.44-1.1 pillar_1.4.2     
+    ## [16] glue_1.3.1        withr_2.3.0       lifecycle_0.1.0  
+    ## [19] stringr_1.4.0     munsell_0.5.0     gtable_0.3.0     
+    ## [22] mvtnorm_1.1-1     codetools_0.2-16  evaluate_0.14    
+    ## [25] labeling_0.3      knitr_1.23        parallel_3.6.3   
+    ## [28] fansi_0.4.0       Rcpp_1.0.6        scales_1.0.0     
+    ## [31] jsonlite_1.6      digest_0.6.19     stringi_1.4.3    
+    ## [34] msm_1.6.8         gsl_2.1-6         cli_2.2.0        
+    ## [37] tools_3.6.3       magrittr_1.5      tibble_2.1.3     
+    ## [40] crayon_1.3.4      pkgconfig_2.0.2   Matrix_1.2-18    
+    ## [43] assertthat_0.2.1  rmarkdown_2.6     R6_2.4.0         
+    ## [46] globals_0.12.4    nlme_3.1-149      compiler_3.6.3
