@@ -19,7 +19,7 @@ ui <- fluidPage(
   
   # Description
   HTML("This page provides an interactive version of Figure 1 in <i> \
-    van der Velde, M., Sense, F., Borst, J., & van Rijn, H. (2021). \
+    Van der Velde, Sense, Borst, & Van Rijn (2021). \
     Capturing Dynamic Performance in a Cognitive Model: Estimating ACT-R Memory Parameters with the Linear Ballistic Accumulator. </i>"),
   
   hr(),
