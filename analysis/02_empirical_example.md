@@ -530,6 +530,108 @@ ggsave(file.path("..", "output", "param_recov_real_dist.png"), width = 6.5, heig
     
     ## Warning: Removed 24 rows containing missing values.
 
+Also make a smaller version for poster:
+
+``` r
+# Randomly sample 3 participants
+set.seed(2020)
+participant_sample <- sample(participants, 3)
+
+d_sample <- filter(d, participant %in% participant_sample)
+sim_lba_sample <- filter(sim_lba, participant %in% participant_sample)
+
+d_sample$participant <- factor(d_sample$participant, levels = participant_sample, labels = c("Participant 1", "Participant 2", "Participant 3"))
+sim_lba_sample$participant <- factor(sim_lba_sample$participant, levels = participant_sample, labels = c("Participant 1", "Participant 2", "Participant 3"))
+
+d_sample$list <- factor(d_sample$list, levels = c(1, 2, 3), labels = c("Session 1", "Session 2", "Session 3"))
+sim_lba_sample$list <- factor(sim_lba_sample$list, levels = c(1, 2, 3), labels = c("Session 1", "Session 2", "Session 3"))
+
+
+trial_counts <- d_sample %>%
+  group_by(participant, list, response) %>%
+  summarise(n = n()) %>%
+  group_by(participant, list) %>%
+  summarise(accuracy = n[response == 1]/sum(n),
+            n = sum(n)) %>%
+  mutate(label = paste0("n = ", n, "\n", prettyNum(accuracy*100, digits = 3), "% correct"))
+
+
+draw_key_custom <- function(data, params, size) {
+  if(data$colour == "#000000" && data$size == .1) { # Data
+    grobTree(
+      linesGrob(
+        c(.1, .1, .3, .3, .3, .5, .5, .5, .7, .7, .7, .9, .9),
+        c(0, .5, .5, 0, .8, .8, 0, .65, .65, 0, .4, .4, 0)
+      ),
+      gp = gpar(
+        col = data$colour %||% "grey20",
+        fill = alpha(data$fill %||% "white", data$alpha),
+        lwd = (data$size %||% 0.5) * .pt,
+        lty = data$linetype %||% 1
+      )
+    )
+  } 
+  else if (data$colour == "#e66101" && data$size == 1.1) { # LBA
+    grobTree(
+      linesGrob(
+        c(0, 1),
+        c(.5, .5)
+      ),
+      gp = gpar(
+        col = alpha(data$colour %||% "grey20", data$alpha),
+        fill = alpha(data$fill %||% "white", data$alpha),
+        lwd = (data$size %||% 0.5) * .pt,
+        lty = data$linetype %||% 1
+      )
+    )
+  }
+  else {
+    grobTree() # Don't draw
+  }
+}
+
+
+d_sample %>%
+  mutate(rt = ifelse(response == 1, rt, -rt),
+         model = "Data") %>%
+  ggplot(aes(x = rt, colour = model)) +
+  facet_grid(list ~ participant, drop = TRUE) +
+  geom_vline(xintercept = 0, lty = 2, colour = "grey80") +
+  geom_histogram(aes(y = ..density..), binwidth = 1, fill = "white", size = .1, key_glyph = draw_key_custom) +
+  geom_line(data = sim_lba_sample, aes(y = density), size = rel(1.1), alpha = .8, key_glyph = draw_key_custom) +
+  geom_text(data = trial_counts, aes(label = label), x = -20, y = .3, hjust = 0, colour = "black", size = rel(3), fontface = "italic") +
+  scale_x_continuous(limits = c(-20, 20), breaks = c(-15, 0, 15)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_colour_manual(values = c("#000000", "#e66101")) +
+  labs(x = "RT (s)",
+       y = "Density",
+       colour = NULL) +
+  theme_paper +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(size = rel(1)),
+        legend.background = element_blank(),
+        legend.position = "top",
+        legend.justification = "right",
+        legend.direction = "vertical",
+        legend.box.margin = unit(c(-20, -30, -20, 0), "pt"))
+```
+
+    ## Warning: Removed 3 rows containing non-finite values (stat_bin).
+
+    ## Warning: Removed 18 rows containing missing values.
+
+![](02_empirical_example_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "param_recov_real_dist_small.pdf"), width = 5, height = 5)
+```
+
+    ## Warning: Removed 3 rows containing non-finite values (stat_bin).
+    
+    ## Warning: Removed 18 rows containing missing values.
+
 ## Analyse ACT-R parameters
 
 Plot distribution of parameter estimates per
@@ -577,7 +679,7 @@ ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant,
         strip.text = element_text(size = rel(1)))
 ```
 
-![](02_empirical_example_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](02_empirical_example_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param_infer_real_values.pdf"), width = 9, height = 3)
@@ -827,16 +929,23 @@ summary(m_t_er)
     ## session1 -0.610       
     ## session3 -0.610  0.500
 
+Not that some of these model fits (sigma\[F\] and F) have singularity
+warnings, meaning that we cannot really draw any meaningful conclusions
+from these fits.
+
 ## Analyse LBA parameters
 
 Also make a plot of the LBA parameters.
 
 ``` r
 param_lba_plotdat <- param_infer_best %>%
-  pivot_longer(`A`:`sdlog_v2`, "parameter", "value") %>%
+  mutate(meanlog_v1 = exp(meanlog_v1),
+         meanlog_v2 = exp(meanlog_v2),
+         distance = b - A/2) %>%
+  pivot_longer(c(`A`:`sdlog_v2`, distance), "parameter", "value") %>%
   mutate(parameter = factor(parameter, 
-                            levels = c( "meanlog_v1", "meanlog_v2", "sdlog_v2", "A", "b", "t0"),
-                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(A), expression(d), expression(t[0]))),
+                            levels = c( "meanlog_v1", "meanlog_v2", "sdlog_v2", "A", "b", "distance", "t0"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(A), expression(d), expression(d - frac(A, 2)), expression(t[0]))),
          list_jitter = jitter(list, .4)) %>%
   filter(participant %in% participants)
 
@@ -846,12 +955,12 @@ param_lba_summary <- param_lba_plotdat %>%
   summarise(median = median(value))
 
 
-ggplot(param_lba_plotdat, aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
-  facet_wrap(~ parameter, ncol = 3, scales = "free", labeller = labeller(parameter = label_parsed))+
+ggplot(filter(param_lba_plotdat, !parameter %in% c("A", "d")), aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
+  facet_wrap(~ parameter, ncol = 5, scales = "free", labeller = labeller(parameter = label_parsed))+
   geom_line(alpha = .15) +
   geom_point(alpha = .25) +
-  geom_line(data = param_lba_summary, aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
-  geom_point(data = param_lba_summary, aes(x = list, y = median, group = parameter), colour = "black", size = rel(2.5)) +
+  geom_line(data = filter(param_lba_summary, !parameter %in% c("A", "d")), aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
+  geom_point(data = filter(param_lba_summary, !parameter %in% c("A", "d")), aes(x = list, y = median, group = parameter), colour = "black", size = rel(2.5)) +
   scale_x_continuous(breaks = c(1, 2, 3)) +
   scale_colour_viridis_d() +
   labs(x = "Session",
@@ -862,10 +971,10 @@ ggplot(param_lba_plotdat, aes(x = list_jitter, y = value, group = participant, c
         strip.text = element_text(size = rel(1)))
 ```
 
-![](02_empirical_example_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](02_empirical_example_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
 ``` r
-ggsave(file.path("..", "output", "param_lba_real_values.pdf"), width = 5, height = 5)
+ggsave(file.path("..", "output", "param_lba_real_values.pdf"), width = 5, height = 3)
 ```
 
 Were there significant changes in parameters from session to session?
@@ -890,30 +999,30 @@ summary(m_mu_c)
     ## Formula: value ~ session + (1 | participant)
     ##    Data: filter(param_lba_modeldat, parameter == "mu[c]")
     ## 
-    ## REML criterion at convergence: 165.1
+    ## REML criterion at convergence: 41.3
     ## 
     ## Scaled residuals: 
     ##     Min      1Q  Median      3Q     Max 
-    ## -5.0355 -0.4456  0.0711  0.5425  2.7006 
+    ## -2.0557 -0.5482 -0.0954  0.4885  6.1007 
     ## 
     ## Random effects:
     ##  Groups      Name        Variance Std.Dev.
-    ##  participant (Intercept) 0.03856  0.1964  
-    ##  Residual                0.13524  0.3677  
+    ##  participant (Intercept) 0.01719  0.1311  
+    ##  Residual                0.05789  0.2406  
     ## Number of obs: 150, groups:  participant, 50
     ## 
     ## Fixed effects:
     ##              Estimate Std. Error        df t value Pr(>|t|)    
-    ## (Intercept)  -0.32710    0.05896 133.82627  -5.548 1.49e-07 ***
-    ## session1     -0.15080    0.07355  98.00000  -2.050    0.043 *  
-    ## session3     -0.04052    0.07355  98.00000  -0.551    0.583    
+    ## (Intercept)   0.77601    0.03875 133.04767  20.025   <2e-16 ***
+    ## session1     -0.11711    0.04812  98.00000  -2.434   0.0168 *  
+    ## session3     -0.02662    0.04812  98.00000  -0.553   0.5813    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
     ## Correlation of Fixed Effects:
     ##          (Intr) sessn1
-    ## session1 -0.624       
-    ## session3 -0.624  0.500
+    ## session1 -0.621       
+    ## session3 -0.621  0.500
 
 ``` r
 # Activation of incorrect answer
@@ -928,30 +1037,30 @@ summary(m_mu_f)
     ## Formula: value ~ session + (1 | participant)
     ##    Data: filter(param_lba_modeldat, parameter == "mu[f]")
     ## 
-    ## REML criterion at convergence: 215.2
+    ## REML criterion at convergence: -273.1
     ## 
     ## Scaled residuals: 
     ##     Min      1Q  Median      3Q     Max 
-    ## -5.7313 -0.3528  0.0468  0.5670  1.7056 
+    ## -2.1364 -0.6160 -0.0980  0.6078  3.3575 
     ## 
     ## Random effects:
     ##  Groups      Name        Variance Std.Dev.
-    ##  participant (Intercept) 0.06499  0.2549  
-    ##  Residual                0.18364  0.4285  
+    ##  participant (Intercept) 0.003715 0.06095 
+    ##  Residual                0.005929 0.07700 
     ## Number of obs: 150, groups:  participant, 50
     ## 
     ## Fixed effects:
     ##              Estimate Std. Error        df t value Pr(>|t|)    
-    ## (Intercept)  -1.52865    0.07052 129.32619 -21.678   <2e-16 ***
-    ## session1      0.06739    0.08571  98.00000   0.786    0.434    
-    ## session3     -0.01725    0.08571  98.00000  -0.201    0.841    
+    ## (Intercept) 2.356e-01  1.389e-02 1.134e+02  16.967   <2e-16 ***
+    ## session1    1.935e-02  1.540e-02 9.800e+01   1.256    0.212    
+    ## session3    2.805e-03  1.540e-02 9.800e+01   0.182    0.856    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
     ## Correlation of Fixed Effects:
     ##          (Intr) sessn1
-    ## session1 -0.608       
-    ## session3 -0.608  0.500
+    ## session1 -0.554       
+    ## session3 -0.554  0.500
 
 ``` r
 # Difference in activation
@@ -966,30 +1075,30 @@ summary(m_mu_diff)
     ## Formula: value ~ session + (1 | participant)
     ##    Data: filter(param_lba_modeldat, parameter == "mu_diff")
     ## 
-    ## REML criterion at convergence: 173.6
+    ## REML criterion at convergence: 21.5
     ## 
     ## Scaled residuals: 
-    ##      Min       1Q   Median       3Q      Max 
-    ## -2.07373 -0.58941 -0.01876  0.49665  2.56755 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -2.1843 -0.5627 -0.0981  0.5025  5.7857 
     ## 
     ## Random effects:
     ##  Groups      Name        Variance Std.Dev.
-    ##  participant (Intercept) 0.08331  0.2886  
-    ##  Residual                0.12123  0.3482  
+    ##  participant (Intercept) 0.01919  0.1385  
+    ##  Residual                0.04813  0.2194  
     ## Number of obs: 150, groups:  participant, 50
     ## 
     ## Fixed effects:
     ##              Estimate Std. Error        df t value Pr(>|t|)    
-    ## (Intercept)   1.20155    0.06396 110.37628  18.786  < 2e-16 ***
-    ## session1     -0.21819    0.06964  98.00000  -3.133  0.00228 ** 
-    ## session3     -0.02327    0.06964  98.00000  -0.334  0.73896    
+    ## (Intercept)   0.54038    0.03669 126.44280  14.727  < 2e-16 ***
+    ## session1     -0.13646    0.04388  98.00000  -3.110  0.00245 ** 
+    ## session3     -0.02943    0.04388  98.00000  -0.671  0.50397    
     ## ---
     ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
     ## 
     ## Correlation of Fixed Effects:
     ##          (Intr) sessn1
-    ## session1 -0.544       
-    ## session3 -0.544  0.500
+    ## session1 -0.598       
+    ## session3 -0.598  0.500
 
 ``` r
 # SD of activation of incorrect answer
@@ -1112,6 +1221,50 @@ summary(m_d)
     ## boundary (singular) fit: see ?isSingular
 
 ``` r
+# Distance d - A/2
+m_distance <- lmer(value ~ session + (1 | participant),
+               data = filter(param_lba_modeldat, parameter == "d - frac(A, 2)"))
+```
+
+    ## boundary (singular) fit: see ?isSingular
+
+``` r
+summary(m_distance)
+```
+
+    ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
+    ## lmerModLmerTest]
+    ## Formula: value ~ session + (1 | participant)
+    ##    Data: filter(param_lba_modeldat, parameter == "d - frac(A, 2)")
+    ## 
+    ## REML criterion at convergence: 171.9
+    ## 
+    ## Scaled residuals: 
+    ##     Min      1Q  Median      3Q     Max 
+    ## -3.2539 -0.6242  0.0098  0.6531  3.5439 
+    ## 
+    ## Random effects:
+    ##  Groups      Name        Variance Std.Dev.
+    ##  participant (Intercept) 0.0000   0.0000  
+    ##  Residual                0.1741   0.4172  
+    ## Number of obs: 150, groups:  participant, 50
+    ## 
+    ## Fixed effects:
+    ##              Estimate Std. Error        df t value Pr(>|t|)    
+    ## (Intercept)   1.73271    0.05900 147.00000  29.367   <2e-16 ***
+    ## session1     -0.06390    0.08344 147.00000  -0.766   0.4450    
+    ## session3     -0.17652    0.08344 147.00000  -2.115   0.0361 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Correlation of Fixed Effects:
+    ##          (Intr) sessn1
+    ## session1 -0.707       
+    ## session3 -0.707  0.500
+    ## convergence code: 0
+    ## boundary (singular) fit: see ?isSingular
+
+``` r
 # Non-retrieval time
 m_t0 <- lmer(value ~ session + (1 | participant),
                data = filter(param_lba_modeldat, parameter == "t[0]"))
@@ -1148,6 +1301,10 @@ summary(m_t0)
     ##          (Intr) sessn1
     ## session1 -0.610       
     ## session3 -0.610  0.500
+
+Not that here too, some of the model fits (A, d, and d - A/2) have
+singularity warnings, meaning that we cannot really draw any meaningful
+conclusions from these fits.
 
 # Session info
 

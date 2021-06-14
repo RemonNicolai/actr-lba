@@ -294,7 +294,6 @@ if (use_cached_results) {
 ```
 
 
-
 ```{r}
 dlba_dat <- crossing(participant = participants,
                      list = lists,
@@ -412,6 +411,97 @@ ggsave(file.path("..", "output", "param_recov_real_dist.pdf"), width = 9, height
 ggsave(file.path("..", "output", "param_recov_real_dist.png"), width = 6.5, height = 4.25, dpi = 600)
 ```
 
+Also make a smaller version for poster:
+```{r}
+# Randomly sample 3 participants
+set.seed(2020)
+participant_sample <- sample(participants, 3)
+
+d_sample <- filter(d, participant %in% participant_sample)
+sim_lba_sample <- filter(sim_lba, participant %in% participant_sample)
+
+d_sample$participant <- factor(d_sample$participant, levels = participant_sample, labels = c("Participant 1", "Participant 2", "Participant 3"))
+sim_lba_sample$participant <- factor(sim_lba_sample$participant, levels = participant_sample, labels = c("Participant 1", "Participant 2", "Participant 3"))
+
+d_sample$list <- factor(d_sample$list, levels = c(1, 2, 3), labels = c("Session 1", "Session 2", "Session 3"))
+sim_lba_sample$list <- factor(sim_lba_sample$list, levels = c(1, 2, 3), labels = c("Session 1", "Session 2", "Session 3"))
+
+
+trial_counts <- d_sample %>%
+  group_by(participant, list, response) %>%
+  summarise(n = n()) %>%
+  group_by(participant, list) %>%
+  summarise(accuracy = n[response == 1]/sum(n),
+            n = sum(n)) %>%
+  mutate(label = paste0("n = ", n, "\n", prettyNum(accuracy*100, digits = 3), "% correct"))
+
+
+draw_key_custom <- function(data, params, size) {
+  if(data$colour == "#000000" && data$size == .1) { # Data
+    grobTree(
+      linesGrob(
+        c(.1, .1, .3, .3, .3, .5, .5, .5, .7, .7, .7, .9, .9),
+        c(0, .5, .5, 0, .8, .8, 0, .65, .65, 0, .4, .4, 0)
+      ),
+      gp = gpar(
+        col = data$colour %||% "grey20",
+        fill = alpha(data$fill %||% "white", data$alpha),
+        lwd = (data$size %||% 0.5) * .pt,
+        lty = data$linetype %||% 1
+      )
+    )
+  } 
+  else if (data$colour == "#e66101" && data$size == 1.1) { # LBA
+    grobTree(
+      linesGrob(
+        c(0, 1),
+        c(.5, .5)
+      ),
+      gp = gpar(
+        col = alpha(data$colour %||% "grey20", data$alpha),
+        fill = alpha(data$fill %||% "white", data$alpha),
+        lwd = (data$size %||% 0.5) * .pt,
+        lty = data$linetype %||% 1
+      )
+    )
+  }
+  else {
+    grobTree() # Don't draw
+  }
+}
+
+
+d_sample %>%
+  mutate(rt = ifelse(response == 1, rt, -rt),
+         model = "Data") %>%
+  ggplot(aes(x = rt, colour = model)) +
+  facet_grid(list ~ participant, drop = TRUE) +
+  geom_vline(xintercept = 0, lty = 2, colour = "grey80") +
+  geom_histogram(aes(y = ..density..), binwidth = 1, fill = "white", size = .1, key_glyph = draw_key_custom) +
+  geom_line(data = sim_lba_sample, aes(y = density), size = rel(1.1), alpha = .8, key_glyph = draw_key_custom) +
+  geom_text(data = trial_counts, aes(label = label), x = -20, y = .3, hjust = 0, colour = "black", size = rel(3), fontface = "italic") +
+  scale_x_continuous(limits = c(-20, 20), breaks = c(-15, 0, 15)) +
+  scale_y_continuous(expand = c(0, 0)) +
+  scale_colour_manual(values = c("#000000", "#e66101")) +
+  labs(x = "RT (s)",
+       y = "Density",
+       colour = NULL) +
+  theme_paper +
+  theme(axis.ticks.y = element_blank(),
+        axis.text.y = element_blank(),
+        strip.background = element_blank(),
+        strip.text = element_text(size = rel(1)),
+        legend.background = element_blank(),
+        legend.position = "top",
+        legend.justification = "right",
+        legend.direction = "vertical",
+        legend.box.margin = unit(c(-20, -30, -20, 0), "pt"))
+
+
+ggsave(file.path("..", "output", "param_recov_real_dist_small.pdf"), width = 5, height = 5)
+```
+
+
 ## Analyse ACT-R parameters
 
 Plot distribution of parameter estimates per session:
@@ -509,15 +599,21 @@ summary(m_t_er)
 
 ```
 
+Not that some of these model fits (sigma[F] and F) have singularity warnings, meaning that we cannot really draw any meaningful conclusions from these fits.
+
+
 ## Analyse LBA parameters
 
 Also make a plot of the LBA parameters.
 ```{r}
 param_lba_plotdat <- param_infer_best %>%
-  pivot_longer(`A`:`sdlog_v2`, "parameter", "value") %>%
+  mutate(meanlog_v1 = exp(meanlog_v1),
+         meanlog_v2 = exp(meanlog_v2),
+         distance = b - A/2) %>%
+  pivot_longer(c(`A`:`sdlog_v2`, distance), "parameter", "value") %>%
   mutate(parameter = factor(parameter, 
-                            levels = c( "meanlog_v1", "meanlog_v2", "sdlog_v2", "A", "b", "t0"),
-                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(A), expression(d), expression(t[0]))),
+                            levels = c( "meanlog_v1", "meanlog_v2", "sdlog_v2", "A", "b", "distance", "t0"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(A), expression(d), expression(d - frac(A, 2)), expression(t[0]))),
          list_jitter = jitter(list, .4)) %>%
   filter(participant %in% participants)
 
@@ -527,12 +623,12 @@ param_lba_summary <- param_lba_plotdat %>%
   summarise(median = median(value))
 
 
-ggplot(param_lba_plotdat, aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
-  facet_wrap(~ parameter, ncol = 3, scales = "free", labeller = labeller(parameter = label_parsed))+
+ggplot(filter(param_lba_plotdat, !parameter %in% c("A", "d")), aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
+  facet_wrap(~ parameter, ncol = 5, scales = "free", labeller = labeller(parameter = label_parsed))+
   geom_line(alpha = .15) +
   geom_point(alpha = .25) +
-  geom_line(data = param_lba_summary, aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
-  geom_point(data = param_lba_summary, aes(x = list, y = median, group = parameter), colour = "black", size = rel(2.5)) +
+  geom_line(data = filter(param_lba_summary, !parameter %in% c("A", "d")), aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
+  geom_point(data = filter(param_lba_summary, !parameter %in% c("A", "d")), aes(x = list, y = median, group = parameter), colour = "black", size = rel(2.5)) +
   scale_x_continuous(breaks = c(1, 2, 3)) +
   scale_colour_viridis_d() +
   labs(x = "Session",
@@ -542,7 +638,7 @@ ggplot(param_lba_plotdat, aes(x = list_jitter, y = value, group = participant, c
   theme(strip.background = element_blank(),
         strip.text = element_text(size = rel(1)))
 
-ggsave(file.path("..", "output", "param_lba_real_values.pdf"), width = 5, height = 5)
+ggsave(file.path("..", "output", "param_lba_real_values.pdf"), width = 5, height = 3)
 ```
 
 Were there significant changes in parameters from session to session?
@@ -591,12 +687,21 @@ m_d <- lmer(value ~ session + (1 | participant),
 
 summary(m_d)
 
+# Distance d - A/2
+m_distance <- lmer(value ~ session + (1 | participant),
+               data = filter(param_lba_modeldat, parameter == "d - frac(A, 2)"))
+
+summary(m_distance)
+
 # Non-retrieval time
 m_t0 <- lmer(value ~ session + (1 | participant),
                data = filter(param_lba_modeldat, parameter == "t[0]"))
 
 summary(m_t0)
 ```
+
+Not that here too, some of the model fits (A, d, and d - A/2) have singularity warnings, meaning that we cannot really draw any meaningful conclusions from these fits.
+
 
 # Session info
 ```{r}
