@@ -237,13 +237,12 @@ Yes, accuracy increases from session 1 to session 2, but there's no evidence of 
 
 ```{r}
 m_rt <- glmer(rt ~ session + (1 | participant),
-              data = mutate(d,
-                            session = factor(list, levels = c(2, 1, 3))),
+              data = filter(mutate(d, session = factor(list, levels = c(2, 1, 3))), response == 1),
               family = Gamma(link = "identity"))
 
 summary(m_rt)
 ```
-RT decreases from session 1 to session 2, and from session 2 to session 3.
+Correct RT decreases from session 1 to session 2, and from session 2 to session 3.
 
 
 # Infer parameters from data
@@ -510,7 +509,94 @@ summary(m_t_er)
 
 ```
 
+## Analyse LBA parameters
 
+Also make a plot of the LBA parameters.
+```{r}
+param_lba_plotdat <- param_infer_best %>%
+  pivot_longer(`A`:`sdlog_v2`, "parameter", "value") %>%
+  mutate(parameter = factor(parameter, 
+                            levels = c( "meanlog_v1", "meanlog_v2", "sdlog_v2", "A", "b", "t0"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(A), expression(d), expression(t[0]))),
+         list_jitter = jitter(list, .4)) %>%
+  filter(participant %in% participants)
+
+
+param_lba_summary <- param_lba_plotdat %>%
+  group_by(parameter, list) %>%
+  summarise(median = median(value))
+
+
+ggplot(param_lba_plotdat, aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
+  facet_wrap(~ parameter, ncol = 3, scales = "free", labeller = labeller(parameter = label_parsed))+
+  geom_line(alpha = .15) +
+  geom_point(alpha = .25) +
+  geom_line(data = param_lba_summary, aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
+  geom_point(data = param_lba_summary, aes(x = list, y = median, group = parameter), colour = "black", size = rel(2.5)) +
+  scale_x_continuous(breaks = c(1, 2, 3)) +
+  scale_colour_viridis_d() +
+  labs(x = "Session",
+       y = "Parameter value") +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size = rel(1)))
+
+ggsave(file.path("..", "output", "param_lba_real_values.pdf"), width = 5, height = 5)
+```
+
+Were there significant changes in parameters from session to session?
+
+```{r}
+param_lba_modeldat <- param_lba_plotdat %>%
+  mutate(session = factor(list, levels = c(2, 1, 3))) %>%
+  select(-list, -list_jitter) %>%
+  pivot_wider(names_from = "parameter", values_from = "value") %>%
+  mutate(mu_diff = `mu[c]` - `mu[f]`) %>%
+  pivot_longer(A:mu_diff, "parameter", "value")
+
+# Activation of correct answer
+m_mu_c <- lmer(value ~ session + (1 | participant),
+               data = filter(param_lba_modeldat, parameter == "mu[c]"))
+
+summary(m_mu_c)
+
+# Activation of incorrect answer
+m_mu_f <- lmer(value ~ session + (1 | participant),
+               data = filter(param_lba_modeldat, parameter == "mu[f]"))
+
+summary(m_mu_f)
+
+# Difference in activation
+m_mu_diff <- lmer(value ~ session + (1 | participant),
+                  data = filter(param_lba_modeldat, parameter == "mu_diff"))
+
+summary(m_mu_diff)
+
+# SD of activation of incorrect answer
+m_sigma_f <- lmer(value ~ session + (1 | participant),
+               data = filter(param_lba_modeldat, parameter == "sigma[f]"))
+
+summary(m_sigma_f)
+
+# Start point boundary A
+m_a <- lmer(value ~ session + (1 | participant),
+               data = filter(param_lba_modeldat, parameter == "A"))
+
+summary(m_a)
+
+# Decision boundary d
+m_d <- lmer(value ~ session + (1 | participant),
+               data = filter(param_lba_modeldat, parameter == "d"))
+
+summary(m_d)
+
+# Non-retrieval time
+m_t0 <- lmer(value ~ session + (1 | participant),
+               data = filter(param_lba_modeldat, parameter == "t[0]"))
+
+summary(m_t0)
+```
 
 # Session info
 ```{r}

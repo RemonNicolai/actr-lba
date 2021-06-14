@@ -286,6 +286,67 @@ ggsave(plot = p_actr_lba, filename = file.path("..", "output", "sim-actr-present
 ggsave(plot = p_rt_comp, filename = file.path("..", "output", "sim-rt-comparison-presentation.png"), width = 4.5, height = 3, dpi = 600)
 ```
 
+Also make a version of the first plot with just LBA labels:
+```{r}
+p_lba <- ggplot() +
+  
+  # t_er rectangle
+  geom_rect(aes(xmax = t_er, xmin = 0, ymin = 0, ymax = 1), fill = "grey80") +
+  geom_segment(aes(xend = t_er, x = 0, y = .5, yend = .5), lty = 1,
+               arrow = arrow(ends = "both", type = "closed", length = unit(2, "mm"))) +
+  geom_text(aes(x = t_er/2, y = .7, label = paste0(expression(t[0]))), parse = TRUE, size = rel(5)) +
+  
+  # Top density plot
+  geom_density(data = sim_actr_viz,
+               aes(x = rt, y = after_stat(count)/(nrow(sim_actr_viz)/2) + lf + .5, colour = as.factor(response)), 
+               n = 2^10,
+               adjust = .05) +
+  
+  # Dotted y-axis
+  geom_vline(xintercept = 0, lty = 3) +
+  
+  # Example trajectories
+  geom_point(data = sim_actr_sample, aes(x = rt, y = f + .5, colour = as.factor(response)), alpha = .25) +
+  geom_segment(data = sim_actr_sample, aes(x = t, xend = rt, y = runif(nrow(sim_actr_sample)), yend = f + .5, colour = as.factor(response)), alpha = .1, lwd = rel(.5)) +
+
+  # Mean drift rate lines
+  geom_segment(aes(x = t_er, xend = lf/exp(a_c_mu) + t_er, yend = lf + .5), y = .5, colour = "#0571b0", lty = 1) +
+  geom_path(aes(x = (lf/exp(a_c_mu)) / 2 + t_er + c(0, .4, .4, 0), 
+                y = lf/2 + .5 + c(0, 0, exp(a_c_mu)*.4, 0))) +
+  geom_label(aes(x = (lf/exp(a_c_mu)) / 2 + t_er + .8, y = lf/2 + .5 + exp(a_c_mu)*.2, 
+                 label = paste0(expression(mu[c]))),
+             parse = TRUE, label.size = NA, size = rel(5), label.padding = unit(.1, "lines")) +
+  
+  geom_segment(aes(x = t_er, xend = lf/exp(a_f_mu) + t_er, yend = lf + .5), y = .5, colour = "#ca0020", lty = 1) +
+  geom_path(aes(x = (lf/exp(a_f_mu)) / 2 + t_er + c(0, .4, .4, 0), 
+                y = lf/2 + .5 + c(0, 0, exp(a_f_mu)*.4, 0))) +
+  geom_label(aes(x = (lf/exp(a_f_mu)) / 2 + t_er + .8, y = lf/2 + .5 + exp(a_f_mu)*.2, 
+                label = paste0(expression(mu[f]))),
+             parse = TRUE, label.size = NA, size = rel(5), label.padding = unit(.1, "lines")) +
+
+  
+  # Boundary line
+  geom_hline(yintercept = lf + .5) +
+
+  scale_x_continuous(expand = c(.0075,0), breaks = NULL) +
+  coord_cartesian(xlim = c(0, 12), clip = "off") +
+  scale_y_continuous(expand = c(0,0), limits = c(0, NA),
+                     breaks = c(0, 1, lf + .5),
+                     labels = c(0, "A", "d")) +
+  scale_colour_manual(values = c("#0571b0", "#ca0020")) +
+  labs(x = "Time",
+       y = NULL) +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme(axis.ticks.y = element_blank(),
+        axis.line.y = element_blank())
+
+p_lba
+
+ggsave(file.path("..", "output", "sim-lba.pdf"), width = 5, height = 3)
+```
+
+
 
 # Session info
 ```{r}
