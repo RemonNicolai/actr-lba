@@ -37,7 +37,7 @@ library(rlang)
 library(lme4)
 library(lmerTest)
 
-future::plan("multiprocess", workers = 6) # Set to desired number of cores
+future::plan("multiprocess", workers = 4) # Set to desired number of cores
 
 theme_paper <- theme_classic(base_size = 14) + 
   theme(axis.text = element_text(colour = "black"))
@@ -599,7 +599,15 @@ summary(m_t_er)
 
 ```
 
-Not that some of these model fits (sigma[F] and F) have singularity warnings, meaning that we cannot really draw any meaningful conclusions from these fits.
+Note that the model for F has a singularity warning, which indicates that the variance of the random effect is essentially zero.
+If we fit a simpler model without random effect, the fixed effects stay the same:
+```{r}
+m_f_simple <- lm(value ~ session,
+               data = filter(param_infer_modeldat, parameter == "F"))
+
+summary(m_f_simple)
+```
+
 
 
 ## Analyse LBA parameters
@@ -700,7 +708,20 @@ m_t0 <- lmer(value ~ session + (1 | participant),
 summary(m_t0)
 ```
 
-Not that here too, some of the model fits (A, d, and d - A/2) have singularity warnings, meaning that we cannot really draw any meaningful conclusions from these fits.
+Note that here too, some of the model fits (d, and d - A/2) have singularity warnings that go away when we fit a model without random effects:
+```{r}
+m_d_simple <- lm(value ~ session,
+               data = filter(param_lba_modeldat, parameter == "d"))
+
+summary(m_d_simple)
+
+m_distance_simple <- lm(value ~ session,
+               data = filter(param_lba_modeldat, parameter == "d - frac(A, 2)"))
+
+summary(m_distance_simple)
+```
+
+
 
 
 # Session info

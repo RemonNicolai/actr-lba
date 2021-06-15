@@ -2,7 +2,7 @@ Example Application: Modelling Changing Retrieval Performance in
 Empirical Data
 ================
 Maarten van der Velde
-Last updated: 2021-06-14
+Last updated: 2021-06-15
 
 # Overview
 
@@ -28,7 +28,7 @@ library(rlang)
 library(lme4)
 library(lmerTest)
 
-future::plan("multiprocess", workers = 6) # Set to desired number of cores
+future::plan("multiprocess", workers = 4) # Set to desired number of cores
 
 theme_paper <- theme_classic(base_size = 14) + 
   theme(axis.text = element_text(colour = "black"))
@@ -929,9 +929,37 @@ summary(m_t_er)
     ## session1 -0.610       
     ## session3 -0.610  0.500
 
-Not that some of these model fits (sigma\[F\] and F) have singularity
-warnings, meaning that we cannot really draw any meaningful conclusions
-from these fits.
+Note that the model for F has a singularity warning, which indicates
+that the variance of the random effect is essentially zero. If we fit a
+simpler model without random effect, the fixed effects stay the same:
+
+``` r
+m_f_simple <- lm(value ~ session,
+               data = filter(param_infer_modeldat, parameter == "F"))
+
+summary(m_f_simple)
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = value ~ session, data = filter(param_infer_modeldat, 
+    ##     parameter == "F"))
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.3576 -0.2604  0.0041  0.2725  1.4785 
+    ## 
+    ## Coefficients:
+    ##             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)  1.73271    0.05900  29.367   <2e-16 ***
+    ## session1    -0.06390    0.08344  -0.766   0.4450    
+    ## session3    -0.17652    0.08344  -2.115   0.0361 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 0.4172 on 147 degrees of freedom
+    ## Multiple R-squared:  0.03027,    Adjusted R-squared:  0.01708 
+    ## F-statistic: 2.294 on 2 and 147 DF,  p-value: 0.1044
 
 ## Analyse LBA parameters
 
@@ -971,7 +999,7 @@ ggplot(filter(param_lba_plotdat, !parameter %in% c("A", "d")), aes(x = list_jitt
         strip.text = element_text(size = rel(1)))
 ```
 
-![](02_empirical_example_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](02_empirical_example_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param_lba_real_values.pdf"), width = 5, height = 3)
@@ -1302,9 +1330,65 @@ summary(m_t0)
     ## session1 -0.610       
     ## session3 -0.610  0.500
 
-Not that here too, some of the model fits (A, d, and d - A/2) have
-singularity warnings, meaning that we cannot really draw any meaningful
-conclusions from these fits.
+Note that here too, some of the model fits (d, and d - A/2) have
+singularity warnings that go away when we fit a model without random
+effects:
+
+``` r
+m_d_simple <- lm(value ~ session,
+               data = filter(param_lba_modeldat, parameter == "d"))
+
+summary(m_d_simple)
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = value ~ session, data = filter(param_lba_modeldat, 
+    ##     parameter == "d"))
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.3062 -0.3047 -0.0002  0.2398  3.7782 
+    ## 
+    ## Coefficients:
+    ##             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)  1.90760    0.07344  25.974   <2e-16 ***
+    ## session1    -0.13075    0.10386  -1.259   0.2101    
+    ## session3    -0.21587    0.10386  -2.078   0.0394 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 0.5193 on 147 degrees of freedom
+    ## Multiple R-squared:  0.02896,    Adjusted R-squared:  0.01575 
+    ## F-statistic: 2.192 on 2 and 147 DF,  p-value: 0.1153
+
+``` r
+m_distance_simple <- lm(value ~ session,
+               data = filter(param_lba_modeldat, parameter == "d - frac(A, 2)"))
+
+summary(m_distance_simple)
+```
+
+    ## 
+    ## Call:
+    ## lm(formula = value ~ session, data = filter(param_lba_modeldat, 
+    ##     parameter == "d - frac(A, 2)"))
+    ## 
+    ## Residuals:
+    ##     Min      1Q  Median      3Q     Max 
+    ## -1.3576 -0.2604  0.0041  0.2725  1.4785 
+    ## 
+    ## Coefficients:
+    ##             Estimate Std. Error t value Pr(>|t|)    
+    ## (Intercept)  1.73271    0.05900  29.367   <2e-16 ***
+    ## session1    -0.06390    0.08344  -0.766   0.4450    
+    ## session3    -0.17652    0.08344  -2.115   0.0361 *  
+    ## ---
+    ## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+    ## 
+    ## Residual standard error: 0.4172 on 147 degrees of freedom
+    ## Multiple R-squared:  0.03027,    Adjusted R-squared:  0.01708 
+    ## F-statistic: 2.294 on 2 and 147 DF,  p-value: 0.1044
 
 # Session info
 
