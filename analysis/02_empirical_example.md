@@ -2,7 +2,7 @@ Example Application: Modelling Changing Retrieval Performance in
 Empirical Data
 ================
 Maarten van der Velde
-Last updated: 2021-06-15
+Last updated: 2021-06-21
 
 # Overview
 
@@ -443,7 +443,7 @@ trial_counts <- d_sample %>%
   group_by(participant, list) %>%
   summarise(accuracy = n[response == 1]/sum(n),
             n = sum(n)) %>%
-  mutate(label = paste0("n = ", n, "\n", prettyNum(accuracy*100, digits = 3), "% correct"))
+  mutate(label = paste0(n, " trials\n", prettyNum(accuracy*100, digits = 3), "% correct"))
 
 
 draw_key_custom <- function(data, params, size) {
@@ -553,7 +553,7 @@ trial_counts <- d_sample %>%
   group_by(participant, list) %>%
   summarise(accuracy = n[response == 1]/sum(n),
             n = sum(n)) %>%
-  mutate(label = paste0("n = ", n, "\n", prettyNum(accuracy*100, digits = 3), "% correct"))
+  mutate(label = paste0(n, " trials\n", prettyNum(accuracy*100, digits = 3), "% correct"))
 
 
 draw_key_custom <- function(data, params, size) {
