@@ -2,7 +2,7 @@ Example Application: Modelling Changing Retrieval Performance in
 Empirical Data
 ================
 Maarten van der Velde
-Last updated: 2021-06-21
+Last updated: 2021-09-30
 
 # Overview
 
@@ -196,7 +196,14 @@ p_acc <- d %>%
   guides(colour = FALSE) +
   theme_paper +
   theme(plot.title = element_text(hjust = .5, size = rel(1)))
+```
 
+    ## `summarise()` has grouped output by 'participant'. You can override using the `.groups` argument.
+
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+``` r
 p_acc
 ```
 
@@ -220,7 +227,14 @@ p_rt <- d %>%
   guides(colour = FALSE) +
   theme_paper +
   theme(plot.title = element_text(hjust = .5, size = rel(1)))
+```
 
+    ## `summarise()` has grouped output by 'participant'. You can override using the `.groups` argument.
+
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+``` r
 p_rt
 ```
 
@@ -444,8 +458,13 @@ trial_counts <- d_sample %>%
   summarise(accuracy = n[response == 1]/sum(n),
             n = sum(n)) %>%
   mutate(label = paste0(n, " trials\n", prettyNum(accuracy*100, digits = 3), "% correct"))
+```
 
+    ## `summarise()` has grouped output by 'participant', 'list'. You can override using the `.groups` argument.
 
+    ## `summarise()` has grouped output by 'participant'. You can override using the `.groups` argument.
+
+``` r
 draw_key_custom <- function(data, params, size) {
   if(data$colour == "#000000" && data$size == .1) { # Data
     grobTree(
@@ -554,8 +573,13 @@ trial_counts <- d_sample %>%
   summarise(accuracy = n[response == 1]/sum(n),
             n = sum(n)) %>%
   mutate(label = paste0(n, " trials\n", prettyNum(accuracy*100, digits = 3), "% correct"))
+```
 
+    ## `summarise()` has grouped output by 'participant', 'list'. You can override using the `.groups` argument.
 
+    ## `summarise()` has grouped output by 'participant'. You can override using the `.groups` argument.
+
+``` r
 draw_key_custom <- function(data, params, size) {
   if(data$colour == "#000000" && data$size == .1) { # Data
     grobTree(
@@ -634,26 +658,22 @@ ggsave(file.path("..", "output", "param_recov_real_dist_small.pdf"), width = 5, 
 
 ## Analyse ACT-R parameters
 
-Plot distribution of parameter estimates per
-session:
+Plot distribution of parameter estimates per session:
 
 ``` r
-param_labs <- c("expression(mu[c])", "expression(mu[f])", "expression(sigma[f])", "expression(F)", "expression(t[er])")
-names(param_labs) <- c("A_c", "A_f", "A_f_sd", "F", "t_er")
-
-
 param_infer_plotdat <- param_infer_best %>%
-  transmute(`F` = b - A/2,
-            A_c = meanlog_v1,
-            A_f = meanlog_v2,
-            A_f_sd = sdlog_v2,
-            t_er = t0,
-            participant,
-            list) %>%
+  transmute(
+    `F` = (b - A + b)/2,
+    A_c = meanlog_v1,
+    A_f = meanlog_v2,
+    A_f_sd = sdlog_v2,
+    t_er = t0,
+    participant,
+    list) %>%
   pivot_longer(`F`:t_er, "parameter", "value") %>%
   mutate(parameter = factor(parameter, 
-                            levels = c("A_c", "A_f", "A_f_sd", "F", "t_er"),
-                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F), expression(t[er]))),
+                            levels = c("A_c", "A_f", "A_f_sd", "F_lower", "F_upper", "F", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(a[F]), expression(b[F]), expression(bar(F)), expression(t[er]))),
          list_jitter = jitter(list, .4)) %>%
   filter(participant %in% participants)
 
@@ -661,10 +681,13 @@ param_infer_plotdat <- param_infer_best %>%
 param_infer_summary <- param_infer_plotdat %>%
   group_by(parameter, list) %>%
   summarise(median = median(value))
+```
 
+    ## `summarise()` has grouped output by 'parameter'. You can override using the `.groups` argument.
 
+``` r
 ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
-  facet_wrap(~ parameter, ncol = 5, scales = "free_y", labeller = labeller(parameter = label_parsed))+
+  facet_wrap(~ parameter, ncol = 7, scales = "free_y", labeller = labeller(parameter = label_parsed))+
   geom_line(alpha = .15) +
   geom_point(alpha = .25) +
   geom_line(data = param_infer_summary, aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
@@ -679,11 +702,56 @@ ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant,
         strip.text = element_text(size = rel(1)))
 ```
 
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
 ![](02_empirical_example_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param_infer_real_values.pdf"), width = 9, height = 3)
 ggsave(file.path("..", "output", "param_infer_real_values.png"), width = 6.5, height = 2.5, dpi = 600)
+```
+
+Make a version of the plot with mu\_c and mu\_f on the same y-axis:
+
+``` r
+library(ggh4x)
+
+par_limits <- param_infer_plotdat %>%
+  filter(parameter %in% c("mu[c]", "mu[f]")) %>%
+  summarise(limits = list(c(min(value), max(value))))
+
+ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
+  facet_wrap(~ parameter, ncol = 7, scales = "free_y", labeller = labeller(parameter = label_parsed)) +
+  geom_line(alpha = .15) +
+  geom_point(alpha = .25) +
+  geom_line(data = param_infer_summary, aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
+  geom_point(data = param_infer_summary, aes(x = list, y = median, group = parameter), colour = "black", size = rel(2.5)) +
+  scale_x_continuous(breaks = c(1, 2, 3)) +
+  facetted_pos_scales(
+    y = list(
+      scale_y_continuous(limits = par_limits$limits[[1]]),
+      scale_y_continuous(limits = par_limits$limits[[1]]),
+      scale_y_continuous(),
+      scale_y_continuous(),
+      scale_y_continuous()
+    )) +
+  scale_colour_viridis_d() +
+  labs(x = "Session",
+       y = "Parameter value") +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size = rel(1)))
+```
+
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+![](02_empirical_example_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "param_infer_real_values_2.pdf"), width = 9, height = 3)
 ```
 
 Were there significant changes in parameters from session to session?
@@ -694,7 +762,7 @@ param_infer_modeldat <- param_infer_plotdat %>%
   select(-list, -list_jitter) %>%
   pivot_wider(names_from = "parameter", values_from = "value") %>%
   mutate(mu_diff = `mu[c]` - `mu[f]`) %>%
-  pivot_longer(F:mu_diff, "parameter", "value")
+  pivot_longer(`bar(F)`:mu_diff, "parameter", "value")
 
 # Activation of correct answer
 m_mu_c <- lmer(value ~ session + (1 | participant),
@@ -850,7 +918,7 @@ summary(m_sigma_f)
 ``` r
 # Latency factor
 m_f <- lmer(value ~ session + (1 | participant),
-               data = filter(param_infer_modeldat, parameter == "F"))
+               data = filter(param_infer_modeldat, parameter == "bar(F)"))
 ```
 
     ## boundary (singular) fit: see ?isSingular
@@ -862,7 +930,7 @@ summary(m_f)
     ## Linear mixed model fit by REML. t-tests use Satterthwaite's method [
     ## lmerModLmerTest]
     ## Formula: value ~ session + (1 | participant)
-    ##    Data: filter(param_infer_modeldat, parameter == "F")
+    ##    Data: filter(param_infer_modeldat, parameter == "bar(F)")
     ## 
     ## REML criterion at convergence: 171.9
     ## 
@@ -935,7 +1003,7 @@ simpler model without random effect, the fixed effects stay the same:
 
 ``` r
 m_f_simple <- lm(value ~ session,
-               data = filter(param_infer_modeldat, parameter == "F"))
+               data = filter(param_infer_modeldat, parameter == "bar(F)"))
 
 summary(m_f_simple)
 ```
@@ -943,7 +1011,7 @@ summary(m_f_simple)
     ## 
     ## Call:
     ## lm(formula = value ~ session, data = filter(param_infer_modeldat, 
-    ##     parameter == "F"))
+    ##     parameter == "bar(F)"))
     ## 
     ## Residuals:
     ##     Min      1Q  Median      3Q     Max 
@@ -981,8 +1049,11 @@ param_lba_plotdat <- param_infer_best %>%
 param_lba_summary <- param_lba_plotdat %>%
   group_by(parameter, list) %>%
   summarise(median = median(value))
+```
 
+    ## `summarise()` has grouped output by 'parameter'. You can override using the `.groups` argument.
 
+``` r
 ggplot(filter(param_lba_plotdat, !parameter %in% c("A", "d")), aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
   facet_wrap(~ parameter, ncol = 5, scales = "free", labeller = labeller(parameter = label_parsed))+
   geom_line(alpha = .15) +
@@ -999,7 +1070,10 @@ ggplot(filter(param_lba_plotdat, !parameter %in% c("A", "d")), aes(x = list_jitt
         strip.text = element_text(size = rel(1)))
 ```
 
-![](02_empirical_example_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+![](02_empirical_example_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param_lba_real_values.pdf"), width = 5, height = 3)
@@ -1398,7 +1472,7 @@ sessionInfo()
 
     ## R version 3.6.3 (2020-02-29)
     ## Platform: x86_64-pc-linux-gnu (64-bit)
-    ## Running under: Ubuntu 18.04.5 LTS
+    ## Running under: Ubuntu 18.04.6 LTS
     ## 
     ## Matrix products: default
     ## BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.7.1
@@ -1417,25 +1491,27 @@ sessionInfo()
     ## [8] methods   base     
     ## 
     ## other attached packages:
-    ##  [1] lmerTest_3.1-0  lme4_1.1-21     Matrix_1.2-18   rlang_0.4.10   
-    ##  [5] cowplot_0.9.4   truncdist_1.0-2 evd_2.3-3       tidyr_1.0.0    
-    ##  [9] furrr_0.1.0     future_1.13.0   purrr_0.3.2     rtdists_0.11-2 
-    ## [13] ggplot2_3.3.2   dplyr_0.8.3    
+    ##  [1] ggh4x_0.2.0     lmerTest_3.1-0  lme4_1.1-21     Matrix_1.2-18  
+    ##  [5] rlang_0.4.10    cowplot_0.9.4   truncdist_1.0-2 evd_2.3-3      
+    ##  [9] tidyr_1.0.0     furrr_0.1.0     future_1.13.0   purrr_0.3.2    
+    ## [13] rtdists_0.11-2  ggplot2_3.3.5   dplyr_1.0.7    
     ## 
     ## loaded via a namespace (and not attached):
     ##  [1] tidyselect_1.1.1    xfun_0.21           listenv_0.7.0      
     ##  [4] splines_3.6.3       lattice_0.20-41     colorspace_1.4-1   
-    ##  [7] vctrs_0.3.8         expm_0.999-4        viridisLite_0.3.0  
-    ## [10] htmltools_0.3.6     yaml_2.2.0          survival_2.44-1.1  
-    ## [13] nloptr_1.2.1        pillar_1.4.2        glue_1.3.1         
-    ## [16] withr_2.3.0         lifecycle_0.1.0     stringr_1.4.0      
-    ## [19] munsell_0.5.0       gtable_0.3.0        mvtnorm_1.1-1      
-    ## [22] codetools_0.2-16    evaluate_0.14       labeling_0.3       
-    ## [25] knitr_1.23          parallel_3.6.3      Rcpp_1.0.6         
-    ## [28] scales_1.0.0        jsonlite_1.6        digest_0.6.19      
-    ## [31] stringi_1.4.3       msm_1.6.8           numDeriv_2016.8-1.1
-    ## [34] gsl_2.1-6           tools_3.6.3         magrittr_1.5       
-    ## [37] tibble_2.1.3        crayon_1.3.4        pkgconfig_2.0.2    
-    ## [40] MASS_7.3-51.4       minqa_1.2.4         assertthat_0.2.1   
-    ## [43] rmarkdown_2.6       R6_2.4.0            globals_0.12.4     
-    ## [46] boot_1.3-25         nlme_3.1-149        compiler_3.6.3
+    ##  [7] vctrs_0.3.8         generics_0.1.0      expm_0.999-4       
+    ## [10] viridisLite_0.3.0   htmltools_0.3.6     yaml_2.2.0         
+    ## [13] utf8_1.1.4          survival_2.44-1.1   nloptr_1.2.1       
+    ## [16] pillar_1.6.3        glue_1.4.2          withr_2.3.0        
+    ## [19] DBI_1.1.0           lifecycle_1.0.1     stringr_1.4.0      
+    ## [22] munsell_0.5.0       gtable_0.3.0        mvtnorm_1.1-1      
+    ## [25] codetools_0.2-16    evaluate_0.14       labeling_0.3       
+    ## [28] knitr_1.23          parallel_3.6.3      fansi_0.4.0        
+    ## [31] Rcpp_1.0.6          scales_1.1.1        jsonlite_1.6       
+    ## [34] farver_2.1.0        digest_0.6.19       stringi_1.4.3      
+    ## [37] msm_1.6.8           numDeriv_2016.8-1.1 gsl_2.1-6          
+    ## [40] tools_3.6.3         magrittr_2.0.1      tibble_2.1.3       
+    ## [43] crayon_1.4.1        pkgconfig_2.0.2     MASS_7.3-51.4      
+    ## [46] ellipsis_0.3.2      minqa_1.2.4         rmarkdown_2.6      
+    ## [49] boot_1.3-25         R6_2.4.0            globals_0.12.4     
+    ## [52] nlme_3.1-149        compiler_3.6.3

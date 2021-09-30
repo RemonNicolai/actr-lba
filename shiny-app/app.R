@@ -31,14 +31,14 @@ ui <- fluidPage(
       sliderInput("latency_factor",
                   HTML("Latency factor <i>F</i>:"),
                   min = 0.5,
-                  max = 5,
-                  value = 2,
-                  step = .1),
+                  max = 2.5,
+                  value = c(1, 2),
+                  step = .05),   
       sliderInput("t_er",
                   HTML("Non-retrieval time <i>t<sub>er</sub></i>:"),
                   min = 0,
-                  max = 5,
-                  value = .5,
+                  max = 3,
+                  value = 1,
                   step = .1),
       sliderInput("a_c_mu",
                   HTML("Mean activation of correct answer <i>&mu;<sub>c</sub></i>:"),
@@ -68,7 +68,7 @@ ui <- fluidPage(
                   "Trials:",
                   min = 1000,
                   max = 1e5,
-                  value = 1e4,
+                  value = 2e4,
                   step = 1000),
       actionButton("reset", "Reset sliders", width = "100%")
     ),
@@ -87,13 +87,13 @@ ui <- fluidPage(
 server <- function(input, output, session) {
   
   observeEvent(input$reset, {
-    updateSliderInput(session, "latency_factor", value = 2)
-    updateSliderInput(session, "t_er", value = .5)
+    updateSliderInput(session, "latency_factor", value = c(1,2))
+    updateSliderInput(session, "t_er", value = 1)
     updateSliderInput(session, "a_c_mu", value = -.5)
     updateSliderInput(session, "a_c_sd", value = 1)
     updateSliderInput(session, "a_f_mu", value = -1.5)
     updateSliderInput(session, "a_f_sd", value = 1.5)
-    updateSliderInput(session, "n", value = 1e4)
+    updateSliderInput(session, "n", value = 2e4)
     
   })
   
@@ -103,7 +103,7 @@ server <- function(input, output, session) {
     n_trials <- input$n
     
     sim_actr <- tibble(
-      f = rep(input$latency_factor, n_trials),
+      f = runif(n_trials, min = input$latency_factor[1], max = input$latency_factor[2]),
       a_c = rnorm(n_trials, mean = input$a_c_mu, sd = input$a_c_sd),
       a_f = rnorm(n_trials, mean = input$a_f_mu, sd = input$a_f_sd),
       t = rep(input$t_er, n_trials)
@@ -116,55 +116,58 @@ server <- function(input, output, session) {
     
     sim_actr_sample <- sample_n(sim_actr, 150)
     
+    
+    A <- input$latency_factor[2] - input$latency_factor[1]
+    
     ggplot() +
       
       # t_er rectangle
-      geom_rect(aes(xmax = input$t_er, xmin = 0, ymin = 0, ymax = 1), fill = "grey80") +
-      geom_segment(aes(xend = input$t_er, x = 0, y = .5, yend = .5), lty = 1,
+      geom_rect(aes(xmax = input$t_er, xmin = 0, ymin = 0, ymax = A), fill = "grey80") +
+      geom_segment(aes(xend = input$t_er, x = 0, y = A/2, yend = A/2), lty = 1,
                    arrow = arrow(ends = "both", type = "closed", length = unit(2, "mm"))) +
-      geom_text(aes(x = input$t_er/2, y = .7, label = paste0(expression(t[er]))), parse = TRUE, size = rel(5)) +
+      geom_text(aes(x = input$t_er/2, y = A/2 + .2, label = paste0(expression(t[er]))), parse = TRUE, size = rel(5)) +
       
       # Top density plot
       geom_density(data = sim_actr,
-                   aes(x = rt, y = after_stat(count)/(nrow(sim_actr)/2) + input$latency_factor + .5, colour = as.factor(response)),
+                   aes(x = rt, y = after_stat(count)/(nrow(sim_actr)/2) + input$latency_factor[2], colour = as.factor(response)),
                    n = 2^10,
                    adjust = .05) +
-      
+
       # Dotted y-axis
       geom_vline(xintercept = 0, lty = 3) +
-      
+
       # F arrow
-      geom_segment(aes(x = 0, xend = 0, y = .5, yend = input$latency_factor + .5),
-                   arrow = arrow(ends = "both", type = "closed", length = unit(2, "mm"))) +
-      geom_text(aes(y = input$latency_factor/2 + .5, x = .2, label = "F"), size = rel(5)) +
-      
+      geom_segment(aes(x = 0, xend = 0, y = A/2, yend = input$latency_factor[2]),
+      arrow = arrow(ends = "both", type = "closed", length = unit(2, "mm"))) +
+      geom_text(aes(y = (input$latency_factor[2] + A/2)/2, x = .2, label = "F"), size = rel(5)) +
+
       # Example trajectories
-      geom_point(data = sim_actr_sample, aes(x = rt, y = f + .5, colour = as.factor(response)), alpha = .25) +
-      geom_segment(data = sim_actr_sample, aes(x = t, xend = rt, y = .5, yend = f + .5, colour = as.factor(response)), alpha = .1, lwd = rel(.5)) +
-      
+      geom_point(data = sim_actr_sample, aes(x = rt, colour = as.factor(response)), y = input$latency_factor[2], alpha = .25) +
+      geom_segment(data = sim_actr_sample, aes(x = t, xend = rt, y = input$latency_factor[2] - f, yend = input$latency_factor[2], colour = as.factor(response)), alpha = .1, lwd = rel(.5)) +
+
       # Mean drift rate lines
-      geom_segment(aes(x = input$t_er, xend = input$latency_factor/exp(input$a_c_mu) + input$t_er, yend = input$latency_factor + .5), y = .5, colour = "#0571b0", lty = 1) +
-      geom_path(aes(x = (input$latency_factor/exp(input$a_c_mu)) / 2 + input$t_er + c(0, .4, .4, 0),
-                    y = input$latency_factor/2 + .5 + c(0, 0, exp(input$a_c_mu)*.4, 0))) +
-      geom_label(aes(x = (input$latency_factor/exp(input$a_c_mu)) / 2 + input$t_er + .725, y = input$latency_factor/2 + .5 + exp(input$a_c_mu)*.2,
+      geom_segment(aes(x = input$t_er, xend = mean(input$latency_factor)/exp(input$a_c_mu) + input$t_er, yend = input$latency_factor[2], y = input$latency_factor[2] - mean(input$latency_factor)), colour = "#0571b0", lty = 1) +
+      geom_path(aes(x = (mean(input$latency_factor)/exp(input$a_c_mu)) / 2 + input$t_er + c(0, .4, .4, 0),
+                    y = (input$latency_factor[2] + A/2)/2 + c(0, 0, exp(input$a_c_mu)*.4, 0))) +
+      geom_label(aes(x = (mean(input$latency_factor)/exp(input$a_c_mu)) / 2 + input$t_er + .725, y = (input$latency_factor[2] + A/2)/2 + exp(input$a_c_mu)*.2,
                      label = paste0(expression(e^mu[c]))),
                  parse = TRUE, label.size = NA, size = rel(5), label.padding = unit(.1, "lines")) +
-      
-      geom_segment(aes(x = input$t_er, xend = input$latency_factor/exp(input$a_f_mu) + input$t_er, yend = input$latency_factor + .5), y = .5, colour = "#ca0020", lty = 1) +
-      geom_path(aes(x = (input$latency_factor/exp(input$a_f_mu)) / 2 + input$t_er + c(0, .4, .4, 0),
-                    y = input$latency_factor/2 + .5 + c(0, 0, exp(input$a_f_mu)*.4, 0))) +
-      geom_label(aes(x = (input$latency_factor/exp(input$a_f_mu)) / 2 + input$t_er + .725, y = input$latency_factor/2 + .5 + exp(input$a_f_mu)*.2,
+
+      geom_segment(aes(x = input$t_er, xend = mean(input$latency_factor)/exp(input$a_f_mu) + input$t_er, yend = input$latency_factor[2], y = input$latency_factor[2] - mean(input$latency_factor)), colour = "#ca0020", lty = 1) +
+      geom_path(aes(x = (mean(input$latency_factor)/exp(input$a_f_mu)) / 2 + input$t_er + c(0, .4, .4, 0),
+                    y = (input$latency_factor[2] + A/2)/2 + c(0, 0, exp(input$a_f_mu)*.4, 0))) +
+      geom_label(aes(x = (mean(input$latency_factor)/exp(input$a_f_mu)) / 2 + input$t_er + .725, y = (input$latency_factor[2] + A/2)/2 + exp(input$a_f_mu)*.2,
                      label = paste0(expression(e^mu[f]))),
                  parse = TRUE, label.size = NA, size = rel(5), label.padding = unit(.1, "lines")) +
-      
-      
+
+
       # Boundary line
-      geom_hline(yintercept = input$latency_factor + .5) +
-      
+      geom_hline(yintercept = input$latency_factor[2]) +
+
       scale_x_continuous(expand = c(.0075,0)) +
       coord_cartesian(xlim = c(0, 12), clip = "off") +
       scale_y_continuous(expand = c(0,0), limits = c(0, NA),
-                         breaks = c(0, .5, 1, input$latency_factor + .5),
+                         breaks = c(0, A/2, A, input$latency_factor[2]),
                          labels = c(0, "A/2", "A", "d")) +
       scale_colour_manual(values = c("#0571b0", "#ca0020")) +
       labs(x = "Time",
@@ -175,6 +178,8 @@ server <- function(input, output, session) {
             axis.line.y = element_blank(),
             axis.text.y = element_text(colour = "grey50"))
     
+
+    
   })
   
   
@@ -183,7 +188,7 @@ server <- function(input, output, session) {
     n_trials <- input$n
     
     sim_actr <- tibble(
-      f = rep(input$latency_factor, n_trials),
+      f = runif(n_trials, min = input$latency_factor[1], max = input$latency_factor[2]),
       a_c = rnorm(n_trials, mean = input$a_c_mu, sd = input$a_c_sd),
       a_f = rnorm(n_trials, mean = input$a_f_mu, sd = input$a_f_sd),
       t = rep(input$t_er, n_trials)
@@ -195,10 +200,10 @@ server <- function(input, output, session) {
       mutate(model = "ACT-R",
              rt = ifelse(response == 1, rt, -rt))
     
-    # F = b - A/2 -> b = F + A/2
-    # Set A to 1 to find the value of b
-    A <- 1
-    b <- input$latency_factor + .5*A
+    
+    A <- input$latency_factor[2] - input$latency_factor[1]
+    b <- input$latency_factor[2]
+    
     
     dlba_dat <- expand.grid(rt = seq(0, 20, by = .01),
                             response = c(1, 2))

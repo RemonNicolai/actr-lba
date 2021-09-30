@@ -506,22 +506,19 @@ ggsave(file.path("..", "output", "param_recov_real_dist_small.pdf"), width = 5, 
 
 Plot distribution of parameter estimates per session:
 ```{r}
-param_labs <- c("expression(mu[c])", "expression(mu[f])", "expression(sigma[f])", "expression(F)", "expression(t[er])")
-names(param_labs) <- c("A_c", "A_f", "A_f_sd", "F", "t_er")
-
-
 param_infer_plotdat <- param_infer_best %>%
-  transmute(`F` = b - A/2,
-            A_c = meanlog_v1,
-            A_f = meanlog_v2,
-            A_f_sd = sdlog_v2,
-            t_er = t0,
-            participant,
-            list) %>%
+  transmute(
+    `F` = (b - A + b)/2,
+    A_c = meanlog_v1,
+    A_f = meanlog_v2,
+    A_f_sd = sdlog_v2,
+    t_er = t0,
+    participant,
+    list) %>%
   pivot_longer(`F`:t_er, "parameter", "value") %>%
   mutate(parameter = factor(parameter, 
-                            levels = c("A_c", "A_f", "A_f_sd", "F", "t_er"),
-                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F), expression(t[er]))),
+                            levels = c("A_c", "A_f", "A_f_sd", "F_lower", "F_upper", "F", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(a[F]), expression(b[F]), expression(bar(F)), expression(t[er]))),
          list_jitter = jitter(list, .4)) %>%
   filter(participant %in% participants)
 
@@ -532,7 +529,7 @@ param_infer_summary <- param_infer_plotdat %>%
 
 
 ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
-  facet_wrap(~ parameter, ncol = 5, scales = "free_y", labeller = labeller(parameter = label_parsed))+
+  facet_wrap(~ parameter, ncol = 7, scales = "free_y", labeller = labeller(parameter = label_parsed))+
   geom_line(alpha = .15) +
   geom_point(alpha = .25) +
   geom_line(data = param_infer_summary, aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
@@ -551,6 +548,40 @@ ggsave(file.path("..", "output", "param_infer_real_values.png"), width = 6.5, he
 ```
 
 
+Make a version of the plot with mu_c and mu_f on the same y-axis:
+```{r}
+library(ggh4x)
+
+par_limits <- param_infer_plotdat %>%
+  filter(parameter %in% c("mu[c]", "mu[f]")) %>%
+  summarise(limits = list(c(min(value), max(value))))
+
+ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant, colour = parameter)) +
+  facet_wrap(~ parameter, ncol = 7, scales = "free_y", labeller = labeller(parameter = label_parsed)) +
+  geom_line(alpha = .15) +
+  geom_point(alpha = .25) +
+  geom_line(data = param_infer_summary, aes(x = list, y = median, group = parameter), colour = "black", lty = 2) +
+  geom_point(data = param_infer_summary, aes(x = list, y = median, group = parameter), colour = "black", size = rel(2.5)) +
+  scale_x_continuous(breaks = c(1, 2, 3)) +
+  facetted_pos_scales(
+    y = list(
+      scale_y_continuous(limits = par_limits$limits[[1]]),
+      scale_y_continuous(limits = par_limits$limits[[1]]),
+      scale_y_continuous(),
+      scale_y_continuous(),
+      scale_y_continuous()
+    )) +
+  scale_colour_viridis_d() +
+  labs(x = "Session",
+       y = "Parameter value") +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size = rel(1)))
+
+ggsave(file.path("..", "output", "param_infer_real_values_2.pdf"), width = 9, height = 3)
+```
+
 Were there significant changes in parameters from session to session?
 
 ```{r}
@@ -559,7 +590,7 @@ param_infer_modeldat <- param_infer_plotdat %>%
   select(-list, -list_jitter) %>%
   pivot_wider(names_from = "parameter", values_from = "value") %>%
   mutate(mu_diff = `mu[c]` - `mu[f]`) %>%
-  pivot_longer(F:mu_diff, "parameter", "value")
+  pivot_longer(`bar(F)`:mu_diff, "parameter", "value")
 
 # Activation of correct answer
 m_mu_c <- lmer(value ~ session + (1 | participant),
@@ -587,7 +618,7 @@ summary(m_sigma_f)
 
 # Latency factor
 m_f <- lmer(value ~ session + (1 | participant),
-               data = filter(param_infer_modeldat, parameter == "F"))
+               data = filter(param_infer_modeldat, parameter == "bar(F)"))
 
 summary(m_f)
 
@@ -603,7 +634,7 @@ Note that the model for F has a singularity warning, which indicates that the va
 If we fit a simpler model without random effect, the fixed effects stay the same:
 ```{r}
 m_f_simple <- lm(value ~ session,
-               data = filter(param_infer_modeldat, parameter == "F"))
+               data = filter(param_infer_modeldat, parameter == "bar(F)"))
 
 summary(m_f_simple)
 ```

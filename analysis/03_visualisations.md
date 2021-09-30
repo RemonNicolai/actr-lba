@@ -1,44 +1,7 @@
 Extra visualisations of the mapping between ACT-R and LBA
 ================
 Maarten van der Velde
-Last updated: 2021-06-14
-
-## Background
-
-In ACT-R, the retrieval time of a chunk with activation \(A_i\) is
-
-\[RT = F * e^{-A_i} + t_{er}\]
-
-In this equation, \(F\) is a “latency factor”, and \(t_{er}\) comprises
-all non-retrieval processes (stimulus encoding, response preparation and
-execution).
-
-ACT-R retrieval is equivalent to an LBA, which becomes apparent when we
-rewrite the equation to this form:
-
-\[RT = \frac{F}{e^{A_i} } + t_{er}\]
-
-Response time in an LBA is defined as follows:
-
-\[RT = \frac{b - A/2}{v} + t_0\]
-
-Here, \(b\) is the response boundary, \(A\) the upper bound of the
-uniform starting point distribution (the average starting point is
-\(A/2\)), \(v\) the drift rate, and \(t_0\) the non-decision time.
-
-In both models, the choice between response alternatives is determined
-by a race process: ACT-R selects the option with the largest activation
-(which by definition also has the smallest RT); LBA selects the option
-with the smallest RT (which by definition also has the largest drift
-rate).
-
-We can make a direct mapping of ACT-R parameters onto LBA parameters:
-
-| **ACT-R**  | **LBA**     |
-| ---------- | ----------- |
-| \(F\)      | \(b - A/2\) |
-| \(A_i\)    | \(ln(v)\)   |
-| \(t_{er}\) | \(t_0\)     |
+Last updated: 2021-09-30
 
 # Setup
 
@@ -72,7 +35,10 @@ Set the ACT-R parameters:
 
 ``` r
 # Latency factor F
-lf <- 2
+lf_mu <- 1.5
+lf_range <- 1
+lf_lower <- lf_mu - .5 * lf_range
+lf_upper <- lf_mu + .5 * lf_range
 
 # Non-retrieval time t_er
 t_er <- 1
@@ -88,7 +54,7 @@ a_f_sd <- 1.5
 
 ``` r
 sim_actr_viz <- tibble(
-  f = rep(lf, n_trials),
+  f = runif(n_trials, min = lf_lower, max = lf_upper),
   a_c = rnorm(n_trials, mean = a_c_mu, sd = a_c_sd),
   a_f = rnorm(n_trials, mean = a_f_mu, sd = a_f_sd),
   t = rep(t_er, n_trials)
@@ -102,17 +68,19 @@ sim_actr_sample <- sample_n(sim_actr_viz, 150)
 ```
 
 ``` r
+A <- lf_upper - lf_lower
+    
 p_actr_lba <- ggplot() +
   
   # t_er rectangle
-  geom_rect(aes(xmax = t_er, xmin = 0, ymin = 0, ymax = 1), fill = "grey80") +
-  geom_segment(aes(xend = t_er, x = 0, y = .5, yend = .5), lty = 1,
+  geom_rect(aes(xmax = t_er, xmin = 0, ymin = 0, ymax = A), fill = "grey80") +
+  geom_segment(aes(xend = t_er, x = 0, y = A/2, yend = A/2), lty = 1,
                arrow = arrow(ends = "both", type = "closed", length = unit(2, "mm"))) +
-  geom_text(aes(x = t_er/2, y = .7, label = paste0(expression(t[er]))), parse = TRUE, size = rel(5)) +
+  geom_text(aes(x = t_er/2, y = A/2 + .2, label = paste0(expression(t[er]))), parse = TRUE, size = rel(5)) +
   
   # Top density plot
   geom_density(data = sim_actr_viz,
-               aes(x = rt, y = after_stat(count)/(nrow(sim_actr_viz)/2) + lf + .5, colour = as.factor(response)), 
+               aes(x = rt, y = after_stat(count)/(nrow(sim_actr_viz)) + lf_upper, colour = as.factor(response)),
                n = 2^10,
                adjust = .05) +
   
@@ -120,37 +88,37 @@ p_actr_lba <- ggplot() +
   geom_vline(xintercept = 0, lty = 3) +
   
   # F arrow
-  geom_segment(aes(x = 0, xend = 0, y = .5, yend = lf + .5),
+  geom_segment(aes(x = 0, xend = 0, y = A/2, yend = lf_upper),
                arrow = arrow(ends = "both", type = "closed", length = unit(2, "mm"))) +
-  geom_text(aes(y = lf/2 + .5, x = .2, label = "F"), size = rel(5)) +
+  geom_text(aes(y = (lf_upper + A/2)/2, x = .2, label = "F"), size = rel(5)) +
   
   # Example trajectories
-  geom_point(data = sim_actr_sample, aes(x = rt, y = f + .5, colour = as.factor(response)), alpha = .25) +
-  geom_segment(data = sim_actr_sample, aes(x = t, xend = rt, y = .5, yend = f + .5, colour = as.factor(response)), alpha = .1, lwd = rel(.5)) +
-
+  geom_point(data = sim_actr_sample, aes(x = rt, colour = as.factor(response)), y = lf_upper, alpha = .25) +
+  geom_segment(data = sim_actr_sample, aes(x = t, xend = rt, y = lf_upper - f, yend = lf_upper, colour = as.factor(response)), alpha = .1, lwd = rel(.5)) +
+  
   # Mean drift rate lines
-  geom_segment(aes(x = t_er, xend = lf/exp(a_c_mu) + t_er, yend = lf + .5), y = .5, colour = "#0571b0", lty = 1) +
-  geom_path(aes(x = (lf/exp(a_c_mu)) / 2 + t_er + c(0, .4, .4, 0), 
-                y = lf/2 + .5 + c(0, 0, exp(a_c_mu)*.4, 0))) +
-  geom_label(aes(x = (lf/exp(a_c_mu)) / 2 + t_er + .8, y = lf/2 + .5 + exp(a_c_mu)*.2, 
+  geom_segment(aes(x = t_er, xend = lf_mu/exp(a_c_mu) + t_er, yend = lf_upper, y = lf_upper - lf_mu), colour = "#0571b0", lty = 1) +
+  geom_path(aes(x = (lf_mu/exp(a_c_mu)) / 2 + t_er + c(0, .4, .4, 0),
+                y = (lf_upper + A/2)/2 + c(0, 0, exp(a_c_mu)*.4, 0))) +
+  geom_label(aes(x = (lf_mu/exp(a_c_mu)) / 2 + t_er + .775, y = (lf_upper + A/2)/2 + exp(a_c_mu)*.2,
                  label = paste0(expression(e^mu[c]))),
              parse = TRUE, label.size = NA, size = rel(5), label.padding = unit(.1, "lines")) +
   
-  geom_segment(aes(x = t_er, xend = lf/exp(a_f_mu) + t_er, yend = lf + .5), y = .5, colour = "#ca0020", lty = 1) +
-  geom_path(aes(x = (lf/exp(a_f_mu)) / 2 + t_er + c(0, .4, .4, 0), 
-                y = lf/2 + .5 + c(0, 0, exp(a_f_mu)*.4, 0))) +
-  geom_label(aes(x = (lf/exp(a_f_mu)) / 2 + t_er + .8, y = lf/2 + .5 + exp(a_f_mu)*.2, 
-                label = paste0(expression(e^mu[f]))),
+  geom_segment(aes(x = t_er, xend = lf_mu/exp(a_f_mu) + t_er, yend = lf_upper, y = lf_upper - lf_mu), colour = "#ca0020", lty = 1) +
+  geom_path(aes(x = (lf_mu/exp(a_f_mu)) / 2 + t_er + c(0, .4, .4, 0),
+                y = (lf_upper + A/2)/2 + c(0, 0, exp(a_f_mu)*.4, 0))) +
+  geom_label(aes(x = (lf_mu/exp(a_f_mu)) / 2 + t_er + .75, y = (lf_upper + A/2)/2 + exp(a_f_mu)*.2,
+                 label = paste0(expression(e^mu[f]))),
              parse = TRUE, label.size = NA, size = rel(5), label.padding = unit(.1, "lines")) +
-
+  
   
   # Boundary line
-  geom_hline(yintercept = lf + .5) +
-
+  geom_hline(yintercept = lf_upper) +
+  
   scale_x_continuous(expand = c(.0075,0), breaks = NULL) +
   coord_cartesian(xlim = c(0, 12), clip = "off") +
   scale_y_continuous(expand = c(0,0), limits = c(0, NA),
-                     breaks = c(0, .5, 1, lf + .5),
+                     breaks = c(0, A/2, A, lf_upper),
                      labels = c(0, "A/2", "A", "d")) +
   scale_colour_manual(values = c("#0571b0", "#ca0020")) +
   labs(x = "Time",
@@ -160,15 +128,16 @@ p_actr_lba <- ggplot() +
   theme(axis.ticks.y = element_blank(),
         axis.line.y = element_blank(),
         axis.text.y = element_text(colour = "grey50"))
+```
 
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+``` r
 p_actr_lba
 ```
 
 ![](03_visualisations_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
-
-``` r
-ggsave(file.path("..", "output", "sim-actr-wide.pdf"), width = 9, height = 3)
-```
 
 # Comparison between models
 
@@ -177,7 +146,7 @@ the same RT distribution.
 
 ``` r
 sim_actr <- tibble(
-  f = rep(lf, n_trials),
+  f = runif(n_trials, min = lf_lower, max = lf_upper),
   a_c = rnorm(n_trials, mean = a_c_mu, sd = a_c_sd),
   a_f = rnorm(n_trials, mean = a_f_mu, sd = a_f_sd),
   t = rep(t_er, n_trials)
@@ -189,10 +158,9 @@ sim_actr <- tibble(
   mutate(model = "ACT-R",
          rt = ifelse(response == 1, rt, -rt))
 
-# F = b - A/2 -> b = F + A/2
-# Set A to 1 to find the value of b
-A <- 1
-b <- lf + .5*A
+
+A <- lf_upper - lf_lower
+b <- lf_upper
 
 dlba_dat <- expand.grid(rt = seq(0, 20, by = .01),
                         response = c(1, 2))
@@ -264,7 +232,7 @@ p_rt_comp <- ggplot(sim_actr, aes(x = rt, colour = model)) +
 p_rt_comp
 ```
 
-    ## Warning: Removed 1227 rows containing non-finite values (stat_bin).
+    ## Warning: Removed 542 rows containing non-finite values (stat_bin).
 
     ## Warning: Removed 2 rows containing missing values.
 
@@ -280,7 +248,7 @@ plot_grid(p_actr_lba, p_rt_comp,
           rel_widths = c(1, .7))
 ```
 
-    ## Warning: Removed 1227 rows containing non-finite values (stat_bin).
+    ## Warning: Removed 542 rows containing non-finite values (stat_bin).
 
     ## Warning: Removed 2 rows containing missing values.
 
@@ -299,74 +267,9 @@ ggsave(plot = p_actr_lba, filename = file.path("..", "output", "sim-actr-present
 ggsave(plot = p_rt_comp, filename = file.path("..", "output", "sim-rt-comparison-presentation.png"), width = 4.5, height = 3, dpi = 600)
 ```
 
-    ## Warning: Removed 1227 rows containing non-finite values (stat_bin).
+    ## Warning: Removed 542 rows containing non-finite values (stat_bin).
 
     ## Warning: Removed 2 rows containing missing values.
-
-Also make a version of the first plot with just LBA labels:
-
-``` r
-p_lba <- ggplot() +
-  
-  # t_er rectangle
-  geom_rect(aes(xmax = t_er, xmin = 0, ymin = 0, ymax = 1), fill = "grey80") +
-  geom_segment(aes(xend = t_er, x = 0, y = .5, yend = .5), lty = 1,
-               arrow = arrow(ends = "both", type = "closed", length = unit(2, "mm"))) +
-  geom_text(aes(x = t_er/2, y = .7, label = paste0(expression(t[0]))), parse = TRUE, size = rel(5)) +
-  
-  # Top density plot
-  geom_density(data = sim_actr_viz,
-               aes(x = rt, y = after_stat(count)/(nrow(sim_actr_viz)/2) + lf + .5, colour = as.factor(response)), 
-               n = 2^10,
-               adjust = .05) +
-  
-  # Dotted y-axis
-  geom_vline(xintercept = 0, lty = 3) +
-  
-  # Example trajectories
-  geom_point(data = sim_actr_sample, aes(x = rt, y = f + .5, colour = as.factor(response)), alpha = .25) +
-  geom_segment(data = sim_actr_sample, aes(x = t, xend = rt, y = runif(nrow(sim_actr_sample)), yend = f + .5, colour = as.factor(response)), alpha = .1, lwd = rel(.5)) +
-
-  # Mean drift rate lines
-  geom_segment(aes(x = t_er, xend = lf/exp(a_c_mu) + t_er, yend = lf + .5), y = .5, colour = "#0571b0", lty = 1) +
-  geom_path(aes(x = (lf/exp(a_c_mu)) / 2 + t_er + c(0, .4, .4, 0), 
-                y = lf/2 + .5 + c(0, 0, exp(a_c_mu)*.4, 0))) +
-  geom_label(aes(x = (lf/exp(a_c_mu)) / 2 + t_er + .8, y = lf/2 + .5 + exp(a_c_mu)*.2, 
-                 label = paste0(expression(mu[c]))),
-             parse = TRUE, label.size = NA, size = rel(5), label.padding = unit(.1, "lines")) +
-  
-  geom_segment(aes(x = t_er, xend = lf/exp(a_f_mu) + t_er, yend = lf + .5), y = .5, colour = "#ca0020", lty = 1) +
-  geom_path(aes(x = (lf/exp(a_f_mu)) / 2 + t_er + c(0, .4, .4, 0), 
-                y = lf/2 + .5 + c(0, 0, exp(a_f_mu)*.4, 0))) +
-  geom_label(aes(x = (lf/exp(a_f_mu)) / 2 + t_er + .8, y = lf/2 + .5 + exp(a_f_mu)*.2, 
-                label = paste0(expression(mu[f]))),
-             parse = TRUE, label.size = NA, size = rel(5), label.padding = unit(.1, "lines")) +
-
-  
-  # Boundary line
-  geom_hline(yintercept = lf + .5) +
-
-  scale_x_continuous(expand = c(.0075,0), breaks = NULL) +
-  coord_cartesian(xlim = c(0, 12), clip = "off") +
-  scale_y_continuous(expand = c(0,0), limits = c(0, NA),
-                     breaks = c(0, 1, lf + .5),
-                     labels = c(0, "A", "d")) +
-  scale_colour_manual(values = c("#0571b0", "#ca0020")) +
-  labs(x = "Time",
-       y = NULL) +
-  guides(colour = FALSE) +
-  theme_paper +
-  theme(axis.ticks.y = element_blank(),
-        axis.line.y = element_blank())
-
-p_lba
-```
-
-![](03_visualisations_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
-
-``` r
-ggsave(file.path("..", "output", "sim-lba.pdf"), width = 5, height = 3)
-```
 
 # Session info
 
@@ -376,7 +279,7 @@ sessionInfo()
 
     ## R version 3.6.3 (2020-02-29)
     ## Platform: x86_64-pc-linux-gnu (64-bit)
-    ## Running under: Ubuntu 18.04.5 LTS
+    ## Running under: Ubuntu 18.04.6 LTS
     ## 
     ## Matrix products: default
     ## BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.7.1
@@ -396,20 +299,21 @@ sessionInfo()
     ## 
     ## other attached packages:
     ## [1] rlang_0.4.10   cowplot_0.9.4  tidyr_1.0.0    rtdists_0.11-2
-    ## [5] ggplot2_3.3.2  dplyr_0.8.3   
+    ## [5] ggplot2_3.3.5  dplyr_1.0.7   
     ## 
     ## loaded via a namespace (and not attached):
-    ##  [1] Rcpp_1.0.6        pillar_1.4.2      compiler_3.6.3   
+    ##  [1] Rcpp_1.0.6        pillar_1.6.3      compiler_3.6.3   
     ##  [4] tools_3.6.3       digest_0.6.19     evd_2.3-3        
-    ##  [7] jsonlite_1.6      lifecycle_0.1.0   evaluate_0.14    
-    ## [10] tibble_2.1.3      gtable_0.3.0      lattice_0.20-41  
-    ## [13] pkgconfig_2.0.2   Matrix_1.2-18     yaml_2.2.0       
-    ## [16] mvtnorm_1.1-1     expm_0.999-4      xfun_0.21        
-    ## [19] withr_2.3.0       stringr_1.4.0     knitr_1.23       
-    ## [22] vctrs_0.3.8       tidyselect_1.1.1  glue_1.3.1       
-    ## [25] R6_2.4.0          survival_2.44-1.1 rmarkdown_2.6    
-    ## [28] purrr_0.3.2       magrittr_1.5      scales_1.0.0     
-    ## [31] htmltools_0.3.6   splines_3.6.3     assertthat_0.2.1 
-    ## [34] colorspace_1.4-1  labeling_0.3      stringi_1.4.3    
-    ## [37] gsl_2.1-6         munsell_0.5.0     msm_1.6.8        
-    ## [40] crayon_1.3.4
+    ##  [7] jsonlite_1.6      lattice_0.20-41   evaluate_0.14    
+    ## [10] lifecycle_1.0.1   tibble_2.1.3      gtable_0.3.0     
+    ## [13] pkgconfig_2.0.2   Matrix_1.2-18     DBI_1.1.0        
+    ## [16] yaml_2.2.0        expm_0.999-4      mvtnorm_1.1-1    
+    ## [19] xfun_0.21         withr_2.3.0       stringr_1.4.0    
+    ## [22] knitr_1.23        generics_0.1.0    vctrs_0.3.8      
+    ## [25] tidyselect_1.1.1  glue_1.4.2        R6_2.4.0         
+    ## [28] fansi_0.4.0       survival_2.44-1.1 rmarkdown_2.6    
+    ## [31] farver_2.1.0      purrr_0.3.2       magrittr_2.0.1   
+    ## [34] splines_3.6.3     scales_1.1.1      ellipsis_0.3.2   
+    ## [37] htmltools_0.3.6   colorspace_1.4-1  labeling_0.3     
+    ## [40] utf8_1.1.4        stringi_1.4.3     gsl_2.1-6        
+    ## [43] munsell_0.5.0     msm_1.6.8         crayon_1.4.1

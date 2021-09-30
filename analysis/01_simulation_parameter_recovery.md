@@ -1,7 +1,7 @@
 Simulation: Recovering ACT-R parameters using the LBA
 ================
 Maarten van der Velde
-Last updated: 2021-06-11
+Last updated: 2021-09-30
 
 # Overview
 
@@ -111,10 +111,11 @@ the context of cued retrieval, we can think of these two options as
 representing (1) the correct response and (2) all possible incorrect
 responses.
 
-The simulated participant will have a single latency factor \(F\) and
-non-retrieval time \(t_{er}\), but the activation of the memory chunks
-will be drawn from a normal distribution to represent the activation
-noise component in ACT-R.
+The simulated participant will have a single non-retrieval time
+\(t_{er}\), but the latency factor \(F\) will be drawn from a uniform
+distribution, and the activation of the memory chunks will be drawn from
+a normal distribution to represent the activation noise component in
+ACT-R.
 
 ## Generate data
 
@@ -132,7 +133,8 @@ Set the ACT-R parameters:
 
 ``` r
 # Latency factor F
-lf <- 2
+lf_lower <- 2
+lf_upper <- 3
 
 # Non-retrieval time t_er
 t_er <- .5
@@ -150,7 +152,7 @@ Generate the data:
 
 ``` r
 sim_actr <- tibble(
-  f = rep(lf, n_trials),
+  f = runif(n_trials, min = lf_lower, max = lf_upper),
   a_c = rnorm(n_trials, mean = a_c_mu, sd = a_c_sd),
   a_f = rnorm(n_trials, mean = a_f_mu, sd = a_f_sd),
   t = rep(t_er, n_trials)
@@ -165,15 +167,23 @@ sim_actr <- tibble(
 head(sim_actr)
 ```
 
+    ## Warning: `...` is not empty.
+    ## 
+    ## We detected these problematic arguments:
+    ## * `needs_dots`
+    ## 
+    ## These dots only exist to allow future extensions and should be empty.
+    ## Did you misspecify an argument?
+
     ## # A tibble: 6 x 6
-    ##       f     a_c    a_f     t    rt response
-    ##   <dbl>   <dbl>  <dbl> <dbl> <dbl>    <dbl>
-    ## 1     2 -0.622  -2.26    0.5  4.23        1
-    ## 2     2  0.0525 -0.667   0.5  2.40        1
-    ## 3     2 -0.151  -1.89    0.5  2.83        1
-    ## 4     2 -0.140  -3.03    0.5  2.80        1
-    ## 5     2  0.398  -1.23    0.5  1.84        1
-    ## 6     2 -2.42   -1.78    0.5 12.4         2
+    ##       f     a_c     a_f     t    rt response
+    ##   <dbl>   <dbl>   <dbl> <dbl> <dbl>    <dbl>
+    ## 1  2.45 -1.02   -0.0456   0.5  3.07        2
+    ## 2  2.78 -1.20   -1.70     0.5  9.74        1
+    ## 3  2.71 -1.46   -0.626    0.5  5.57        2
+    ## 4  2.38  0.364  -3.04     0.5  2.15        1
+    ## 5  2.64 -0.573  -0.698    0.5  5.18        1
+    ## 6  2.70 -0.0759 -1.26     0.5  3.41        1
 
 ``` r
 prop.table(table(sim_actr$response))
@@ -181,7 +191,7 @@ prop.table(table(sim_actr$response))
 
     ## 
     ##       1       2 
-    ## 0.70966 0.29034
+    ## 0.71041 0.28959
 
 Note: a response of 1 indicates a correct answer, 2 an incorrect answer.
 
@@ -194,10 +204,8 @@ distribution, which means that we can keep the untransformed (i.e.,
 log-scale) activation mean and SD from ACT-R.
 
 ``` r
-# F = b - A/2 -> b = F + A/2
-# Set A to 1 to find the value of b
-A <- 1
-b <- lf + .5*A
+A <- lf_upper - lf_lower
+b <- lf_upper
 
 dlba_dat <- crossing(rt = seq(0, 20, by = .01),
                      response = c(1, 2))
@@ -242,7 +250,10 @@ sim_actr %>%
         strip.text = element_blank())
 ```
 
-    ## Warning: Removed 1137 rows containing non-finite values (stat_bin).
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+    ## Warning: Removed 2225 rows containing non-finite values (stat_bin).
 
     ## Warning: Removed 2 rows containing missing values (geom_bar).
 
@@ -252,7 +263,7 @@ sim_actr %>%
 
 ``` r
 if (use_cached_results) {
-  
+
   s1_param_recov_best <- readRDS(file.path("..", "output", "s1_param_recov_best.rds"))
   
 } else {
@@ -273,7 +284,9 @@ parameters that generated the data, transform from LBA parameters to
 ACT-R parameters:
 
 ``` r
-f_recov <- s1_param_recov_best$b - .5*s1_param_recov_best$A
+f_lower_recov <- s1_param_recov_best$b - s1_param_recov_best$A
+f_upper_recov <- s1_param_recov_best$b
+f_recov <- (f_upper_recov + f_lower_recov)/2
 t_recov <- s1_param_recov_best$t0
 a_c_recov <- s1_param_recov_best$meanlog_v1
 a_f_recov <- s1_param_recov_best$meanlog_v2
@@ -281,9 +294,9 @@ a_c_sd_recov <- rep(1, nrow(s1_param_recov_best))
 a_f_sd_recov <- s1_param_recov_best$sdlog_v2
 
 
-s1_par_comp <- tibble(parameter = rep(c("F", "t_er", "A_correct", "A_incorrect", "A_correct_sd", "A_incorrect_sd"), each = nrow(s1_param_recov_best)),
-                      original = rep(c(lf, t_er, a_c_mu, a_f_mu, a_c_sd, a_f_sd), each = nrow(s1_param_recov_best)),
-                      recovered = c(f_recov, t_recov, a_c_recov, a_f_recov, a_c_sd_recov, a_f_sd_recov))
+s1_par_comp <- tibble(parameter = rep(c("F_lower", "F_upper", "F", "t_er", "A_correct", "A_incorrect", "A_correct_sd", "A_incorrect_sd"), each = nrow(s1_param_recov_best)),
+                      original = rep(c(lf_lower, lf_upper, (lf_upper + lf_lower)/2, t_er, a_c_mu, a_f_mu, a_c_sd, a_f_sd), each = nrow(s1_param_recov_best)),
+                      recovered = c(f_lower_recov, f_upper_recov, f_recov, t_recov, a_c_recov, a_f_recov, a_c_sd_recov, a_f_sd_recov))
 ```
 
 Comparison of original ACT-R parameters to recovered parameter estimates
@@ -317,6 +330,9 @@ ggplot(s1_par_comp, aes(x = parameter, y = original - recovered)) +
   theme_paper
 ```
 
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 # Simulation 2: single participant, vary dataset size
@@ -325,7 +341,7 @@ How accurately can we recover parameters from smaller datasets?
 
 ``` r
 if (use_cached_results) {
-  
+
   s2_param_recov_best <- readRDS(file.path("..", "output", "s2_param_recov_best.rds"))
   
 } else {
@@ -362,7 +378,9 @@ parameters that generated the data, transform from LBA parameters to
 ACT-R parameters:
 
 ``` r
-f_recov <- s2_param_recov_best$b - .5*s2_param_recov_best$A
+f_lower_recov <- s2_param_recov_best$b - s2_param_recov_best$A
+f_upper_recov <- s2_param_recov_best$b
+f_recov <- (f_upper_recov + f_lower_recov)/2
 t_recov <- s2_param_recov_best$t0
 a_c_recov <- s2_param_recov_best$meanlog_v1
 a_f_recov <- s2_param_recov_best$meanlog_v2
@@ -370,10 +388,10 @@ a_c_sd_recov <- rep(1, nrow(s2_param_recov_best))
 a_f_sd_recov <- s2_param_recov_best$sdlog_v2
 
 
-s2_par_comp <- tibble(parameter = rep(c("F", "t_er", "A_correct", "A_incorrect", "A_correct_sd", "A_incorrect_sd"), each = nrow(s2_param_recov_best)),
-                   original = rep(c(lf, t_er, a_c_mu, a_f_mu, a_c_sd, a_f_sd), each = nrow(s2_param_recov_best)),
-                   recovered = c(f_recov, t_recov, a_c_recov, a_f_recov, a_c_sd_recov, a_f_sd_recov),
-                   dataset_size = rep(s2_param_recov_best$dataset_size, 6))
+s2_par_comp <- tibble(parameter = rep(c("F_lower", "F_upper", "F", "t_er", "A_correct", "A_incorrect", "A_correct_sd", "A_incorrect_sd"), each = nrow(s2_param_recov_best)),
+                   original = rep(c(lf_lower, lf_upper, (lf_lower + lf_upper)/2, t_er, a_c_mu, a_f_mu, a_c_sd, a_f_sd), each = nrow(s2_param_recov_best)),
+                   recovered = c(f_lower_recov, f_upper_recov, f_recov, t_recov, a_c_recov, a_f_recov, a_c_sd_recov, a_f_sd_recov),
+                   dataset_size = rep(s2_param_recov_best$dataset_size, 8))
 ```
 
 Comparison of original ACT-R parameters to recovered parameter estimates
@@ -414,7 +432,8 @@ s2_par_comp %>%
   theme_paper 
 ```
 
-    ## Warning: Grouping rowwise data frame strips rowwise nature
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
 
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
 
@@ -423,7 +442,9 @@ s2_par_comp %>%
 Here, we extend the previous example by simulating data from multiple
 participants, each with their own memory parameters.
 
-Each participant will have a latency factor \(F \sim N_+(1, .5)\) and a
+Each participant will have a latency factor \(F\) uniform distribution,
+defined by a mean \(\overline{F} \sim N_+(1, .5)\) and a range
+\(R_F \sim N_+(.1, .05)\). Each participant will also have a
 non-retrieval time \(t_{er} \sim N_+(.75, .5)\). The activation of their
 memory chunks will be drawn from two normal distributions, with mean
 \(\mu_{c} \sim N_-(-.5, .5)\) and \(\mu_{f} \sim N_-(-1.5, .5)\), and
@@ -449,6 +470,9 @@ Set the ACT-R parameters:
 ``` r
 # Latency factor F
 lf <- rtrunc(n_participants, spec = "norm", mean = 1, sd = .5, a = 0, b = Inf)
+lf_range <- rtrunc(n_participants, spec = "norm", mean = .1, sd = .05, a = 0, b = Inf)
+lf_lower <- lf - .5 * lf_range
+lf_upper <- lf + .5 * lf_range
 
 # Non-retrieval time t_er
 t_er <- rtrunc(n_participants, spec = "norm", mean = .75, sd = .5, a = 0, b = Inf)
@@ -466,7 +490,7 @@ Distribution of
 parameters:
 
 ``` r
-tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd) %>%
+tibble(participant = 1:n_participants, lf_lower, lf_upper, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd) %>%
   pivot_longer(-participant, "parameter") %>%
   ggplot(aes(x = parameter, y = value, colour = parameter)) +
   geom_boxplot(outlier.shape = NA) +
@@ -478,20 +502,22 @@ tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd)
   theme_paper
 ```
 
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
 Alternative
 visualisation:
 
 ``` r
-tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd) %>%
+tibble(participant = 1:n_participants, lf_lower, lf_upper, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd) %>%
   pivot_longer(-participant, "parameter") %>%
   mutate(parameter = factor(parameter, 
-                            levels = c("a_c_mu", "a_f_mu", "a_c_sd", "a_f_sd", "lf", "t_er"),
-                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[c]), expression(sigma[f]), expression(F), expression(t[er])))) %>%
+                            levels = c("a_c_mu", "a_f_mu", "a_c_sd", "a_f_sd", "lf_lower", "lf_upper", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[c]), expression(sigma[f]), expression(F[a]), expression(F[b]), expression(t[er])))) %>%
   ggplot(aes(y = parameter, x = value, colour = (parameter))) +
   facet_grid(parameter ~ ., scales = "free", switch = "y", labeller = labeller(parameter = label_parsed)) +
-  # geom_boxplot(outlier.shape = NA) +
   geom_hline(aes(yintercept = parameter), colour = "grey90", lty = 3) +
   geom_jitter(height = .1, width = 0, size = .5) +
   labs(x = NULL,
@@ -506,6 +532,9 @@ tibble(participant = 1:n_participants, lf, t_er, a_c_mu, a_c_sd, a_f_mu, a_f_sd)
         axis.line.y = element_blank())
 ```
 
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
 
 ``` r
@@ -516,7 +545,7 @@ Generate the data:
 
 ``` r
 sim_actr <- tibble(participant = rep(1:n_participants, each = n_trials),
-       f = rep(lf, each = n_trials),
+       f = runif(n_participants * n_trials, min = rep(lf_lower, each = n_trials), max = rep(lf_upper, each = n_trials)),
        a_c = rnorm(n_participants * n_trials, mean = rep(a_c_mu, each = n_trials), sd = rep(a_c_sd, each = n_trials)),
        a_f = rnorm(n_participants * n_trials, mean = rep(a_f_mu, each = n_trials), sd = rep(a_f_sd, each = n_trials)),
        t = rep(t_er, each = n_trials)
@@ -531,23 +560,31 @@ sim_actr <- tibble(participant = rep(1:n_participants, each = n_trials),
 head(sim_actr)
 ```
 
+    ## Warning: `...` is not empty.
+    ## 
+    ## We detected these problematic arguments:
+    ## * `needs_dots`
+    ## 
+    ## These dots only exist to allow future extensions and should be empty.
+    ## Did you misspecify an argument?
+
     ## # A tibble: 6 x 7
     ##   participant     f    a_c    a_f     t    rt response
     ##         <int> <dbl>  <dbl>  <dbl> <dbl> <dbl>    <dbl>
-    ## 1           1 0.955 -1.35  -1.67   1.45  5.14        1
-    ## 2           1 0.955 -1.34  -3.16   1.45  5.09        1
-    ## 3           1 0.955 -0.433 -2.84   1.45  2.92        1
-    ## 4           1 0.955 -2.18  -3.18   1.45  9.91        1
-    ## 5           1 0.955  0.932 -0.832  1.45  1.82        1
-    ## 6           1 0.955 -0.788 -1.82   1.45  3.54        1
+    ## 1           1 1.01  -0.346 -1.09  0.841  2.27        1
+    ## 2           1 0.908 -3.23   0.614 0.841  1.33        2
+    ## 3           1 0.978 -0.642  1.11  0.841  1.16        2
+    ## 4           1 0.990  0.164 -2.83  0.841  1.68        1
+    ## 5           1 0.932 -0.310 -1.78  0.841  2.11        1
+    ## 6           1 0.916 -0.381 -4.39  0.841  2.18        1
 
 ``` r
 prop.table(table(sim_actr$response))
 ```
 
     ## 
-    ##     1     2 
-    ## 0.586 0.414
+    ##      1      2 
+    ## 0.7468 0.2532
 
 RT
 distributions:
@@ -566,6 +603,9 @@ ggplot(mutate(sim_actr, rt = ifelse(response == 1, rt, -rt)), aes(x = rt, group 
   theme(strip.background = element_blank(),
         strip.text = element_blank())
 ```
+
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
 
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
 
@@ -603,7 +643,10 @@ if (use_cached_results) {
 ```
 
 ``` r
-f_recov <- s3_param_recov_best$b - .5*s3_param_recov_best$A
+# f_recov <- s3_param_recov_best$b - .5*s3_param_recov_best$A
+f_lower_recov <- s3_param_recov_best$b - s3_param_recov_best$A
+f_upper_recov <- s3_param_recov_best$b
+f_recov <- (f_upper_recov + f_lower_recov)/2
 t_recov <- s3_param_recov_best$t0
 a_c_recov <- s3_param_recov_best$meanlog_v1
 a_f_recov <- s3_param_recov_best$meanlog_v2
@@ -612,10 +655,10 @@ a_f_sd_recov <- s3_param_recov_best$sdlog_v2
 
 
 s3_par_comp <- tibble(
-  participant = rep(1:n_participants, 6),
-  parameter = rep(c("F", "t_er", "A_correct", "A_incorrect", "A_correct_sd", "A_incorrect_sd"), each = n_participants),
-  original = c(lf, t_er, a_c_mu, a_f_mu, a_c_sd, a_f_sd),
-  recovered = c(f_recov, t_recov, a_c_recov, a_f_recov, a_c_sd_recov, a_f_sd_recov)
+  participant = rep(1:n_participants, 8),
+  parameter = rep(c("F_lower", "F_upper", "F", "t_er", "A_correct", "A_incorrect", "A_correct_sd", "A_incorrect_sd"), each = n_participants),
+  original = c(lf_lower, lf_upper, lf, t_er, a_c_mu, a_f_mu, a_c_sd, a_f_sd),
+  recovered = c(f_lower_recov, f_upper_recov, f_recov, t_recov, a_c_recov, a_f_recov, a_c_sd_recov, a_f_sd_recov)
 )
 ```
 
@@ -626,15 +669,15 @@ from the LBA:
 s3_par_comp_plot <- s3_par_comp %>%
   filter(parameter != "A_correct_sd") %>%
   mutate(parameter = factor(parameter, 
-                            levels = c("A_correct", "A_incorrect", "A_incorrect_sd", "F", "t_er"),
-                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F), expression(t[er]))))
+                            levels = c("A_correct", "A_incorrect", "A_incorrect_sd", "F_lower", "F_upper", "F", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F[a]), expression(F[b]), expression(bar(F)), expression(t[er])))) %>%
+  filter(!parameter %in% c("F[a]", "F[b]"))
 
 p_par_comp <- ggplot(s3_par_comp_plot, aes(x = original, y = recovered)) +
   facet_wrap(~ parameter, ncol = 3, scales = "free_x", labeller = labeller(parameter = label_parsed))+
   geom_abline(lty = 2, colour = "grey80") +
   geom_smooth(method = "lm", formula = y ~ x, alpha = .5, colour = "black", lwd = rel(.8)) +
   geom_point(aes(colour = parameter), alpha = .5) +
-  # coord_fixed() +
   labs(x = "Original",
          y = "Recovered",
          colour = NULL) +
@@ -645,7 +688,12 @@ p_par_comp <- ggplot(s3_par_comp_plot, aes(x = original, y = recovered)) +
   theme_paper +
   theme(strip.background = element_blank(),
         strip.text = element_text(size = rel(1)))
+```
 
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+``` r
 p_par_comp
 ```
 
@@ -672,11 +720,65 @@ ggplot(s3_par_comp_plot, aes(x = original, y = recovered)) +
         strip.text = element_text(size = rel(1)))
 ```
 
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
 ![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-30-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param-recov-comparison.png"), width = 6.5, height = 3, dpi = 600)
 ```
+
+Set axis limits by facet:
+
+``` r
+library(scales)
+library(ggh4x)
+
+par_limits <- s3_par_comp_plot %>%
+  group_by(parameter) %>%
+  summarise(limits = list(c(min(c(original, recovered)), max(c(original, recovered)))))
+
+p_par_comp <- ggplot(s3_par_comp_plot, aes(x = original, y = recovered)) +
+  facet_wrap(~ parameter, ncol = 7, scales = "free", labeller = labeller(parameter = label_parsed)) +
+  geom_abline(lty = 2, colour = "grey80") +
+  geom_smooth(method = "lm", formula = y ~ x, alpha = .2, colour = "black", lwd = rel(.8)) +
+  geom_point(aes(colour = parameter), alpha = .9) +
+  labs(x = "Original",
+         y = "Recovered",
+         colour = NULL) +
+  facetted_pos_scales(
+    x = list(
+      scale_x_continuous(limits = par_limits$limits[[1]]),
+      scale_x_continuous(limits = par_limits$limits[[2]]),
+      scale_x_continuous(limits = par_limits$limits[[3]]),
+      scale_x_continuous(limits = par_limits$limits[[4]]),
+      scale_x_continuous(limits = par_limits$limits[[5]])
+    ),
+    y = list(
+      scale_y_continuous(limits = par_limits$limits[[1]]),
+      scale_y_continuous(limits = par_limits$limits[[2]]),
+      scale_y_continuous(limits = par_limits$limits[[3]]),
+      scale_y_continuous(limits = par_limits$limits[[4]]),
+      scale_y_continuous(limits = par_limits$limits[[5]])
+    )) +
+  scale_colour_viridis_d() +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme_paper +
+  theme(strip.background = element_blank(),
+        strip.text = element_text(size = rel(1)),
+        aspect.ratio = 1)
+```
+
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+``` r
+p_par_comp
+```
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-31-1.png)<!-- -->
 
 Compare fitted LBA density to data:
 
@@ -726,11 +828,14 @@ sim_actr %>%
         strip.text = element_blank())
 ```
 
-    ## Warning: Removed 6 rows containing non-finite values (stat_bin).
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+    ## Warning: Removed 14 rows containing non-finite values (stat_bin).
 
     ## Warning: Removed 50 rows containing missing values (geom_bar).
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-32-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
 
 Alternative plot for presentation:
 
@@ -790,22 +895,57 @@ sim_actr %>%
         axis.text.y = element_blank(),
         strip.background = element_blank(),
         strip.text = element_blank(),
-        # legend.background = element_blank(),
         legend.position = "top",
         legend.justification = "left",
         legend.direction = "vertical",
         legend.box.margin = unit(c(-20, 0, -40, -30), "pt"))
 ```
 
+    ## Warning: Removed 1 rows containing non-finite values (stat_bin).
+
     ## Warning: Removed 6 rows containing missing values.
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-34-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param-recov-dist-comp.png"), width = 1.75, height = 3, dpi = 600)
 ```
 
+    ## Warning: Removed 1 rows containing non-finite values (stat_bin).
+    
     ## Warning: Removed 6 rows containing missing values.
+
+Plot correlation between parameters:
+
+``` r
+library(GGally)
+
+p_par_cor <- s3_par_comp_plot %>%
+  select(-original) %>%
+  pivot_wider(names_from = parameter, values_from = recovered) %>%
+  select(participant, `mu[c]`, `mu[f]`, `sigma[f]`, `bar(F)`, `t[er]`) %>%
+  ggpairs(columns = 2:6,
+          labeller = "label_parsed",
+          lower = list(continuous = wrap("smooth_lm", se = FALSE, alpha = .5)),
+          upper = list(continuous = wrap("cor", display_grid = TRUE, digits = 2, stars = TRUE)),
+          axisLabels = "show",
+          switch = "both",
+          progress = FALSE) +
+  theme_paper +
+  theme(strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(size = rel(1)),
+        strip.text.y.left = element_text(angle = 0),
+        axis.text = element_blank())
+
+p_par_cor
+```
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-35-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "param_recov_corr.pdf"), width = 4.5, height = 4.5)
+```
 
 # Simulation 4: multiple participants, vary dataset size
 
@@ -821,6 +961,9 @@ set.seed(2021)
 
 # Latency factor F
 lf <- rtrunc(n_participants, spec = "norm", mean = 1, sd = .5, a = 0, b = Inf)
+lf_range <- rtrunc(n_participants, spec = "norm", mean = .1, sd = .05, a = 0, b = Inf)
+lf_lower <- lf - .5 * lf_range
+lf_upper <- lf + .5 * lf_range
 
 # Non-retrieval time t_er
 t_er <- rtrunc(n_participants, spec = "norm", mean = .75, sd = .5, a = 0, b = Inf)
@@ -845,7 +988,7 @@ Generate datasets of different sizes and recover the parameters:
 
 ``` r
 if (use_cached_results) {
-  
+
   s4_param_recov <- bind_rows(readRDS(file.path("..", "output", "s4_param_recov.rds")),
                               readRDS(file.path("..", "output", "s3_param_recov_best.rds")) %>%
                                 mutate(dataset_size = 100))
@@ -861,7 +1004,8 @@ if (use_cached_results) {
     n_trials <- dataset_sizes[i]
     
     sim_actr <- tibble(participant = rep(1:n_participants, each = n_trials),
-                       f = rep(lf, each = n_trials),
+                       # f = rep(lf, each = n_trials),
+                       f = runif(n_participants * n_trials, min = rep(lf_lower, each = n_trials), max = rep(lf_upper, each = n_trials)),
                        a_c = rnorm(n_participants * n_trials, mean = rep(a_c_mu, each = n_trials), sd = rep(a_c_sd, each = n_trials)),
                        a_f = rnorm(n_participants * n_trials, mean = rep(a_f_mu, each = n_trials), sd = rep(a_f_sd, each = n_trials)),
                        t = rep(t_er, each = n_trials)
@@ -906,24 +1050,28 @@ s4_param_recov_long <- s4_param_recov %>%
   transmute(
     n = dataset_size,
     participant,
-    F = b - .5*A,
+    F_lower = b - A,
+    F_upper = b,
+    F = (b - A + b)/2,
     t_er = t0,
     A_correct = meanlog_v1,
     A_incorrect = meanlog_v2,
     A_correct_sd = 1,
     A_incorrect_sd = sdlog_v2
   ) %>%
-  pivot_longer(F:A_incorrect_sd, names_to = "parameter", values_to = "recovered")
+  pivot_longer(F_lower:A_incorrect_sd, names_to = "parameter", values_to = "recovered")
 
 s4_param_orig_long <- tibble(n = rep(c(dataset_sizes, 100), each = n_participants),
                              participant = rep(1:n_participants, length(dataset_sizes) + 1),
+                             F_lower = rep(lf_lower, length(dataset_sizes) + 1),
+                             F_upper = rep(lf_upper, length(dataset_sizes) + 1),
                              F = rep(lf, length(dataset_sizes) + 1),
                              t_er = rep(t_er, length(dataset_sizes) + 1),
                              A_correct = rep(a_c_mu, length(dataset_sizes) + 1),
                              A_incorrect = rep(a_f_mu, length(dataset_sizes) + 1),
                              A_correct_sd = rep(a_c_sd, length(dataset_sizes) + 1),
                              A_incorrect_sd = rep(a_f_sd, length(dataset_sizes) + 1)) %>%
-  pivot_longer(F:A_incorrect_sd, names_to = "parameter", values_to = "original")
+  pivot_longer(F_lower:A_incorrect_sd, names_to = "parameter", values_to = "original")
 
 s4_par_comp <- left_join(s4_param_recov_long, s4_param_orig_long, by = c("n", "participant", "parameter"))
 ```
@@ -937,14 +1085,13 @@ ggplot(s4_par_comp, aes(x = original, y = recovered, colour = parameter)) +
   facet_wrap(~ n, labeller = function(x) label_both(labels = x, sep = " = ")) +
   geom_abline(lty = 2) +
   geom_point() +
-  # coord_equal() +
   labs(x = "Original parameter value",
          y = "Recovered parameter value",
          colour = "Parameter") +
   theme_paper
 ```
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-40-1.png)<!-- -->
 
 Difference between the original ACT-R parameters and the recovered
 parameter estimates from the LBA, as a function of datset size:
@@ -953,8 +1100,9 @@ parameter estimates from the LBA, as a function of datset size:
 s4_par_comp_error <- s4_par_comp %>%
   filter(parameter != "A_correct_sd") %>%
   mutate(parameter = factor(parameter, 
-                            levels = c("A_correct", "A_incorrect", "A_incorrect_sd", "F", "t_er"),
-                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F), expression(t[er])))) %>%
+                            levels = c("A_correct", "A_incorrect", "A_incorrect_sd", "F_lower", "F_upper", "F", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F[a]), expression(F[b]), expression(bar(F)), expression(t[er])))) %>%
+  filter(!parameter %in% c("F[a]", "F[b]")) %>%
   rowwise() %>%
   mutate(ae = abs(original - recovered)) %>%
   ungroup()
@@ -962,16 +1110,23 @@ s4_par_comp_error <- s4_par_comp %>%
 s4_par_comp_error_param <- s4_par_comp_error %>%
   group_by(n, parameter) %>%
   summarise(mae = mean(ae))
+```
 
+    ## `summarise()` has grouped output by 'n'. You can override using the `.groups` argument.
+
+``` r
 s4_par_comp_error_mean <- s4_par_comp_error %>%
   group_by(n, parameter) %>%
   summarise(mae = mean(ae)) %>%
   group_by(n) %>%
   summarise(mae = mean(mae))
+```
 
+    ## `summarise()` has grouped output by 'n'. You can override using the `.groups` argument.
 
-p_par_comp_multi <- ggplot() +
-  geom_rect(aes(xmin = exp(log(100) - .25), xmax = exp(log(100) + .25), ymin = 0, ymax = 2), colour = NA, fill = "grey90") +
+``` r
+p_par_comp_multi_error <- ggplot() +
+  geom_rect(aes(xmin = exp(log(100) - .25), xmax = exp(log(100) + .25), ymin = 0, ymax = 2.05), colour = NA, fill = "grey90") +
   geom_jitter(data = s4_par_comp_error, aes(x = n, y = ae, colour = parameter), height = 0, width = .025, alpha = .05) +
   geom_line(data = s4_par_comp_error_param, aes(x = n, y = mae, group = parameter, colour = parameter), lty = 2) +
   geom_point(data = s4_par_comp_error_param, aes(x = n, y = mae, group = parameter, colour = parameter), alpha = .9) +
@@ -979,7 +1134,7 @@ p_par_comp_multi <- ggplot() +
   geom_point(data = s4_par_comp_error_mean, aes(x = n, y = mae), size = rel(2)) +
   scale_x_log10(breaks = c(25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000),
                 labels = c(25, 50, 100, 250, 500, "1K", "2.5K", "5K", "10K", "25K", "50K")) +
-  scale_y_continuous(expand = c(0, 0)) +
+  scale_y_continuous(expand = expansion(0, c(0, .05))) +
   scale_colour_viridis_d() +
   coord_cartesian(ylim = c(0, 2)) +
   labs(x = "Number of trials",
@@ -989,14 +1144,17 @@ p_par_comp_multi <- ggplot() +
   theme(axis.text.x = element_text(face = c("plain", "plain", "bold", "plain", "plain", "plain", "plain", "plain", "plain", "plain", "plain")))
 ```
 
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
     ## Warning: Vectorized input to `element_text()` is not officially supported.
     ## Results may be unexpected or may change in future versions of ggplot2.
 
 ``` r
-p_par_comp_multi
+p_par_comp_multi_error
 ```
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-39-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-41-1.png)<!-- -->
 
 Make version with colour legend for presentation:
 
@@ -1016,7 +1174,6 @@ ggplot() +
   labs(x = "Number of trials",
        y = "Absolute error",
        colour = NULL) +
-  # guides(colour = FALSE) +
   theme_paper +
   theme(axis.text.x = element_text(face = c("plain", "plain", "bold", "plain", "plain", "plain", "plain", "plain", "plain", "plain", "plain")),
         legend.background = element_blank(),
@@ -1029,7 +1186,7 @@ ggplot() +
     ## Warning: Vectorized input to `element_text()` is not officially supported.
     ## Results may be unexpected or may change in future versions of ggplot2.
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-40-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-42-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param-recov-multi-error.png"), width = 6, height = 3, dpi = 600)
@@ -1038,16 +1195,160 @@ ggsave(file.path("..", "output", "param-recov-multi-error.png"), width = 6, heig
 Make the figure in the paper:
 
 ``` r
-plot_grid(p_par_comp, p_par_comp_multi,
+plot_grid(p_par_comp, p_par_comp_multi_error,
           align = "hv",
           axis = "tblr",
           labels = c("A", "B"))
 ```
 
-![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-41-1.png)<!-- -->
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-43-1.png)<!-- -->
 
 ``` r
 ggsave(file.path("..", "output", "param_recov_multi_combi.pdf"), width = 9, height = 4.5)
+```
+
+Also calculate correlation between original and recovered parameter
+values:
+
+``` r
+s4_par_comp_cor <- s4_par_comp %>%
+  filter(parameter != "A_correct_sd") %>%
+  mutate(parameter = factor(parameter, 
+                            levels = c("A_correct", "A_incorrect", "A_incorrect_sd", "F_lower", "F_upper", "F", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F[a]), expression(F[b]), expression(F), expression(t[er])))) %>%
+  filter(!parameter %in% c("F[a]", "F[b]")) %>%
+  group_by(n, parameter) %>%
+  summarise(r = cor(original, recovered, method = "pearson"))
+```
+
+    ## `summarise()` has grouped output by 'n'. You can override using the `.groups` argument.
+
+``` r
+s4_par_comp_cor_mean <- s4_par_comp_cor %>%
+  group_by(n) %>%
+  summarise(r = mean(r))
+
+p_par_comp_multi_cor <- ggplot(s4_par_comp_cor, aes(x = n, y = r)) +
+  geom_rect(aes(xmin = exp(log(100) - .25), xmax = exp(log(100) + .25), ymin = 0, ymax = 1.05), colour = NA, fill = "grey90") +
+  geom_line(aes(group = parameter, colour = parameter), lty = 2) +
+  geom_point(aes(group = parameter, colour = parameter), alpha = .9) +
+  geom_line(data = s4_par_comp_cor_mean, lty = 2, lwd = rel(.85)) +
+  geom_point(data = s4_par_comp_cor_mean, size = rel(2)) +
+  scale_x_log10(breaks = c(25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000),
+                labels = c(25, 50, 100, 250, 500, "1K", "2.5K", "5K", "10K", "25K", "50K")) +
+  scale_y_continuous(breaks = seq(0, 1, by = .2), expand = expansion(0, c(0, .05))) +
+  scale_colour_viridis_d() +
+  coord_cartesian(ylim = c(0, 1)) +
+  labs(x = "Number of trials",
+       y = "Correlation") +
+  guides(colour = FALSE) +
+  theme_paper +
+  theme(axis.text.x = element_text(face = c("plain", "plain", "bold", "plain", "plain", "plain", "plain", "plain", "plain", "plain", "plain")))
+```
+
+    ## Warning: `guides(<scale> = FALSE)` is deprecated. Please use
+    ## `guides(<scale> = "none")` instead.
+
+    ## Warning: Vectorized input to `element_text()` is not officially supported.
+    ## Results may be unexpected or may change in future versions of ggplot2.
+
+``` r
+p_par_comp_multi_cor
+```
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-44-1.png)<!-- -->
+
+Plot correlation between the recovered parameters in the 50K trials
+case:
+
+``` r
+p_par_cor <- s4_par_comp %>%
+  filter(n == 50000) %>%
+  filter(parameter != "A_correct_sd") %>%
+  mutate(parameter = factor(parameter, 
+                            levels = c("A_correct", "A_incorrect", "A_incorrect_sd", "F_lower", "F_upper", "F", "t_er"),
+                            labels  = c(expression(mu[c]), expression(mu[f]), expression(sigma[f]), expression(F[a]), expression(F[b]), expression(bar(F)), expression(t[er])))) %>%
+  filter(!parameter %in% c("F[a]", "F[b]")) %>%
+  select(-original) %>%
+  pivot_wider(names_from = parameter, values_from = recovered) %>%
+  select(participant, `mu[c]`, `mu[f]`, `sigma[f]`, `bar(F)`, `t[er]`) %>%
+  ggpairs(columns = 2:6,
+          labeller = "label_parsed",
+          lower = list(continuous = wrap("smooth_lm", se = FALSE, alpha = .5)),
+          upper = list(continuous = wrap("cor", display_grid = TRUE, digits = 2, stars = TRUE)),
+          axisLabels = "show",
+          switch = "both",
+          progress = FALSE) +
+  theme_paper +
+  theme(strip.background = element_blank(),
+        strip.placement = "outside",
+        strip.text = element_text(size = rel(1)),
+        strip.text.y.left = element_text(angle = 0),
+        axis.text = element_blank())
+
+p_par_cor
+```
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-45-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "param_recov_corr.pdf"), width = 4.5, height = 4.5)
+```
+
+Make the figure in the extended paper, which includes correlation
+alongside absolute error:
+
+``` r
+plot_grid(p_par_comp,
+          plot_grid(
+            p_par_comp_multi_error,
+            p_par_comp_multi_cor,
+            labels = c("B", "C"),
+            align = "v",
+            axis = "tb"
+          ),
+          ncol = 1,
+          labels = c("A"),
+          align = "h",
+          axis = "lr")
+```
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-46-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "param_recov_multi_combi_2.pdf"), width = 9, height = 4.5)
+```
+
+Add between-parameter correlation:
+
+``` r
+plot_grid(p_par_comp,
+          plot_grid(
+                    plot_grid(
+                      p_par_comp_multi_error,
+                      p_par_comp_multi_cor,
+                      ncol = 1,
+                      labels = c("B", "C"),
+                      align = "h",
+                      axis = "lr"),
+                    ggmatrix_gtable(p_par_cor),
+                    ncol = 2,
+                    labels = c("", "D"),
+                    align = "v",
+                    axis = "tb"
+            ),
+          ncol = 1,
+          labels = c("A"),
+          align = "h",
+          axis = "lr",
+          rel_heights = c(.6, 1)
+          )
+```
+
+![](01_simulation_parameter_recovery_files/figure-gfm/unnamed-chunk-47-1.png)<!-- -->
+
+``` r
+ggsave(file.path("..", "output", "param_recov_multi_combi_3.pdf"), width = 9, height = 7.5)
 ```
 
 # Session info
@@ -1058,7 +1359,7 @@ sessionInfo()
 
     ## R version 3.6.3 (2020-02-29)
     ## Platform: x86_64-pc-linux-gnu (64-bit)
-    ## Running under: Ubuntu 18.04.5 LTS
+    ## Running under: Ubuntu 18.04.6 LTS
     ## 
     ## Matrix products: default
     ## BLAS:   /usr/lib/x86_64-linux-gnu/blas/libblas.so.3.7.1
@@ -1077,24 +1378,27 @@ sessionInfo()
     ## [8] methods   base     
     ## 
     ## other attached packages:
-    ##  [1] rlang_0.4.10    cowplot_0.9.4   truncdist_1.0-2 evd_2.3-3      
-    ##  [5] tidyr_1.0.0     furrr_0.1.0     future_1.13.0   purrr_0.3.2    
-    ##  [9] rtdists_0.11-2  ggplot2_3.3.2   dplyr_0.8.3    
+    ##  [1] GGally_2.1.2    ggh4x_0.2.0     scales_1.1.1    rlang_0.4.10   
+    ##  [5] cowplot_0.9.4   truncdist_1.0-2 evd_2.3-3       tidyr_1.0.0    
+    ##  [9] furrr_0.1.0     future_1.13.0   purrr_0.3.2     rtdists_0.11-2 
+    ## [13] ggplot2_3.3.5   dplyr_1.0.7    
     ## 
     ## loaded via a namespace (and not attached):
-    ##  [1] tidyselect_1.1.1  xfun_0.21         listenv_0.7.0    
-    ##  [4] splines_3.6.3     lattice_0.20-41   colorspace_1.4-1 
-    ##  [7] vctrs_0.3.8       expm_0.999-4      htmltools_0.3.6  
-    ## [10] viridisLite_0.3.0 yaml_2.2.0        mgcv_1.8-28      
-    ## [13] utf8_1.1.4        survival_2.44-1.1 pillar_1.4.2     
-    ## [16] glue_1.3.1        withr_2.3.0       lifecycle_0.1.0  
-    ## [19] stringr_1.4.0     munsell_0.5.0     gtable_0.3.0     
-    ## [22] mvtnorm_1.1-1     codetools_0.2-16  evaluate_0.14    
-    ## [25] labeling_0.3      knitr_1.23        parallel_3.6.3   
-    ## [28] fansi_0.4.0       Rcpp_1.0.6        scales_1.0.0     
-    ## [31] jsonlite_1.6      digest_0.6.19     stringi_1.4.3    
-    ## [34] msm_1.6.8         gsl_2.1-6         cli_2.2.0        
-    ## [37] tools_3.6.3       magrittr_1.5      tibble_2.1.3     
-    ## [40] crayon_1.3.4      pkgconfig_2.0.2   Matrix_1.2-18    
-    ## [43] assertthat_0.2.1  rmarkdown_2.6     R6_2.4.0         
-    ## [46] globals_0.12.4    nlme_3.1-149      compiler_3.6.3
+    ##  [1] tidyselect_1.1.1   xfun_0.21          listenv_0.7.0     
+    ##  [4] splines_3.6.3      lattice_0.20-41    colorspace_1.4-1  
+    ##  [7] vctrs_0.3.8        generics_0.1.0     expm_0.999-4      
+    ## [10] viridisLite_0.3.0  htmltools_0.3.6    mgcv_1.8-28       
+    ## [13] yaml_2.2.0         utf8_1.1.4         survival_2.44-1.1 
+    ## [16] pillar_1.6.3       glue_1.4.2         withr_2.3.0       
+    ## [19] DBI_1.1.0          RColorBrewer_1.1-2 plyr_1.8.4        
+    ## [22] lifecycle_1.0.1    stringr_1.4.0      munsell_0.5.0     
+    ## [25] gtable_0.3.0       mvtnorm_1.1-1      codetools_0.2-16  
+    ## [28] evaluate_0.14      labeling_0.3       knitr_1.23        
+    ## [31] parallel_3.6.3     fansi_0.4.0        Rcpp_1.0.6        
+    ## [34] jsonlite_1.6       farver_2.1.0       digest_0.6.19     
+    ## [37] stringi_1.4.3      msm_1.6.8          gsl_2.1-6         
+    ## [40] tools_3.6.3        magrittr_2.0.1     tibble_2.1.3      
+    ## [43] crayon_1.4.1       pkgconfig_2.0.2    ellipsis_0.3.2    
+    ## [46] Matrix_1.2-18      reshape_0.8.8      rmarkdown_2.6     
+    ## [49] R6_2.4.0           globals_0.12.4     nlme_3.1-149      
+    ## [52] compiler_3.6.3
