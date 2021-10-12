@@ -568,8 +568,8 @@ ggplot(param_infer_plotdat, aes(x = list_jitter, y = value, group = participant,
       scale_y_continuous(limits = par_limits$limits[[1]]),
       scale_y_continuous(limits = par_limits$limits[[1]]),
       scale_y_continuous(),
-      scale_y_continuous(),
-      scale_y_continuous()
+      scale_y_continuous(limits = c(0, NA)),
+      scale_y_continuous(limits = c(0, NA))
     )) +
   scale_colour_viridis_d() +
   labs(x = "Session",

@@ -950,19 +950,26 @@ p_par_comp_multi_error <- ggplot() +
   geom_rect(aes(xmin = exp(log(100) - .25), xmax = exp(log(100) + .25), ymin = 0, ymax = 2.05), colour = NA, fill = "grey90") +
   geom_jitter(data = s4_par_comp_error, aes(x = n, y = ae, colour = parameter), height = 0, width = .025, alpha = .05) +
   geom_line(data = s4_par_comp_error_param, aes(x = n, y = mae, group = parameter, colour = parameter), lty = 2) +
-  geom_point(data = s4_par_comp_error_param, aes(x = n, y = mae, group = parameter, colour = parameter), alpha = .9) +
+  geom_point(data = s4_par_comp_error_param, aes(x = n, y = mae, group = parameter, colour = parameter, pch = parameter), alpha = .9) +
   geom_line(data = s4_par_comp_error_mean, aes(x = n, y = mae), lty = 2, lwd = rel(.85)) +
   geom_point(data = s4_par_comp_error_mean, aes(x = n, y = mae), size = rel(2)) +
   scale_x_log10(breaks = c(25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000),
                 labels = c(25, 50, 100, 250, 500, "1K", "2.5K", "5K", "10K", "25K", "50K")) +
   scale_y_continuous(expand = expansion(0, c(0, .05))) +
-  scale_colour_viridis_d() +
+  scale_colour_viridis_d(labels = scales::parse_format()) +
+  scale_shape_manual(labels = scales::parse_format(), values = c(15, 0, 17, 6, 19)) +
   coord_cartesian(ylim = c(0, 2)) +
   labs(x = "Number of trials",
-       y = "Absolute error") +
-  guides(colour = FALSE) +
+       y = "Absolute error",
+       colour = NULL,
+       pch = NULL) +
   theme_paper +
-  theme(axis.text.x = element_text(face = c("plain", "plain", "bold", "plain", "plain", "plain", "plain", "plain", "plain", "plain", "plain")))
+  theme(axis.text.x = element_text(face = c("plain", "plain", "bold", "plain", "plain", "plain", "plain", "plain", "plain", "plain", "plain")),
+        legend.background = element_blank(),
+        legend.direction = "horizontal",
+        legend.position = "top",
+        legend.justification = "right",
+        legend.box.margin = unit(c(0, 0, -40, 0), "pt"))
 
 p_par_comp_multi_error
 ```
@@ -1024,17 +1031,19 @@ s4_par_comp_cor_mean <- s4_par_comp_cor %>%
 p_par_comp_multi_cor <- ggplot(s4_par_comp_cor, aes(x = n, y = r)) +
   geom_rect(aes(xmin = exp(log(100) - .25), xmax = exp(log(100) + .25), ymin = 0, ymax = 1.05), colour = NA, fill = "grey90") +
   geom_line(aes(group = parameter, colour = parameter), lty = 2) +
-  geom_point(aes(group = parameter, colour = parameter), alpha = .9) +
+  geom_point(aes(group = parameter, colour = parameter, shape = parameter), alpha = .9) +
   geom_line(data = s4_par_comp_cor_mean, lty = 2, lwd = rel(.85)) +
   geom_point(data = s4_par_comp_cor_mean, size = rel(2)) +
   scale_x_log10(breaks = c(25, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000),
                 labels = c(25, 50, 100, 250, 500, "1K", "2.5K", "5K", "10K", "25K", "50K")) +
   scale_y_continuous(breaks = seq(0, 1, by = .2), expand = expansion(0, c(0, .05))) +
   scale_colour_viridis_d() +
+  scale_shape_manual(labels = scales::parse_format(), values = c(15, 0, 17, 6, 19)) +
   coord_cartesian(ylim = c(0, 1)) +
   labs(x = "Number of trials",
        y = "Correlation") +
-  guides(colour = FALSE) +
+  guides(colour = FALSE,
+         shape = FALSE) +
   theme_paper +
   theme(axis.text.x = element_text(face = c("plain", "plain", "bold", "plain", "plain", "plain", "plain", "plain", "plain", "plain", "plain")))
 
