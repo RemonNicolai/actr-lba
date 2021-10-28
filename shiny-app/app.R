@@ -1,4 +1,4 @@
-## Shiny app hosted at https://mavdvelde.shinyapps.io/actr-lba/
+## Shiny app hosted at https://cogmod.shinyapps.io/actr-lba/
 ## Author: Maarten van der Velde
 
 library(shiny)
@@ -19,8 +19,8 @@ ui <- fluidPage(
   
   # Description
   HTML("This page provides an interactive version of Figure 1 in <i> \
-    Van der Velde, Sense, Borst, & Van Rijn (2021). \
-    Capturing Dynamic Performance in a Cognitive Model: Estimating ACT-R Memory Parameters with the Linear Ballistic Accumulator. </i>"),
+    van der Velde, Sense, Borst, van Maanen, & van Rijn (2021). \
+    Capturing Dynamic Performance in a Cognitive Model: Estimating ACT-R Memory Parameters with the Linear Ballistic Accumulator. <a href='https://doi.org/10.31234/osf.io/yg7s6'>10.31234/osf.io/yg7s6</a></i>"),
   
   hr(),
   
