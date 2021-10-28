@@ -17,5 +17,6 @@ This repository contains the code associated with the manuscript **Capturing Dyn
 
 ## Links
 
-  - [Shiny app](https://mavdvelde.shinyapps.io/actr-lba/)
+  - [Preprint](https://doi.org/10.31234/osf.io/yg7s6)
+  - [Shiny app](https://cogmod.shinyapps.io/actr-lba/)
   - [OSF project](https://osf.io/wpvj7/)
