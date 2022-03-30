@@ -1,7 +1,7 @@
 Extra visualisations of the mapping between ACT-R and LBA
 ================
 Maarten van der Velde
-Last updated: 2021-09-30
+Last updated: 2022-03-30
 
 # Setup
 
@@ -90,7 +90,7 @@ p_actr_lba <- ggplot() +
   # F arrow
   geom_segment(aes(x = 0, xend = 0, y = A/2, yend = lf_upper),
                arrow = arrow(ends = "both", type = "closed", length = unit(2, "mm"))) +
-  geom_text(aes(y = (lf_upper + A/2)/2, x = .2, label = "F"), size = rel(5)) +
+  geom_text(aes(y = (lf_upper + A/2)/2, x = .2, label = paste0(expression(bar(F)))), parse = TRUE, size = rel(5)) +
   
   # Example trajectories
   geom_point(data = sim_actr_sample, aes(x = rt, colour = as.factor(response)), y = lf_upper, alpha = .25) +
