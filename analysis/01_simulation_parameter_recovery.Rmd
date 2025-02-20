@@ -45,7 +45,10 @@ library(cowplot)
 library(grid)
 library(rlang)
 
-future::plan("multiprocess", workers = 6) # Set to desired number of cores
+
+n_cores = 6
+future::plan("multisession", workers = n_cores) # Set to desired number of cores
+# future::plan("multicore", workers = n_cores) # for mac users
 
 theme_paper <- theme_classic(base_size = 14) + 
   theme(axis.text = element_text(colour = "black"))
@@ -228,7 +231,7 @@ if (use_cached_results) {
 } else {
   
   n_attempts <- 100 # More attempts = more chances to reach global optimum
-  s1_param_recov <- future_map_dfr(1:n_attempts, function(x) recover_parameters(data = sim_actr, obj_fun = obj_fun))
+  s1_param_recov <- future_map_dfr(1:n_attempts, ~ recover_parameters(data = sim_actr, obj_fun = obj_fun))
   saveRDS(s1_param_recov, file.path("..", "output", "s1_param_recov.rds"))
 
   # Only keep the best fit across all attempts, which is closest to the global optimum

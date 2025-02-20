@@ -37,7 +37,9 @@ library(rlang)
 library(lme4)
 library(lmerTest)
 
-future::plan("multiprocess", workers = 4) # Set to desired number of cores
+n_cores = 4
+future::plan("multisession", workers = n_cores) # Set to desired number of cores
+# future::plan("multicore", workers = n_cores) # for mac users
 
 theme_paper <- theme_classic(base_size = 14) + 
   theme(axis.text = element_text(colour = "black"))
@@ -257,23 +259,26 @@ if (use_cached_results) {
   
 } else {
   
+  distinct_session <- d %>% distinct(participant, list) # grab distinct sessions
+  n_iter <- nrow(distinct_session) 
   n_attempts <- 250
-  param_infer <- list()
+  param_infer <- vector("list", n_iter)
   
-  for(i in 1:length(participants)) {
-    for(j in 1:length(lists)) {
-      param_infer <- append(param_infer,
-                            list(future_map_dfr(1:n_attempts, function(x) {
-                              recover_parameters(data = filter(d,
-                                                               participant == participants[i],
-                                                               list == lists[j]),
-                                                 obj_fun = obj_fun)
-                            }) %>%
-                              mutate(participant = participants[i],
-                                     list = lists[j])
-                            )
-      )
-    }
+  # loop over each distinct session
+  for(i in 1:n_iter) { 
+    
+    cat("Running iteration", i, "/", n_iter, "\n") 
+    
+    par <- as.integer(distinct_session$participant[i]) # participant
+    ses <- as.integer(distinct_session$list[i]) # session/list
+    
+    dat <- d %>% filter(participant == user, list == ses) # subset data
+    
+    param_infer[[i]] <- future_map_dfr(1:n_attempts,
+                                       ~ recover_parameters(data = dat,
+                                                            obj_fun = obj_fun)
+                                       ) %>%
+      mutate(participant = par, list = ses)  
   }
   
   param_infer <- bind_rows(param_infer)
