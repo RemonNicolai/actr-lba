@@ -37,9 +37,8 @@ library(rlang)
 library(lme4)
 library(lmerTest)
 
-n_cores = 4
-future::plan("multisession", workers = n_cores) # Set to desired number of cores
-# future::plan("multicore", workers = n_cores) # for mac users
+n_cores = 4 # Set to desired number of cores
+future::plan("multisession", workers = n_cores) 
 
 theme_paper <- theme_classic(base_size = 14) + 
   theme(axis.text = element_text(colour = "black"))
@@ -272,7 +271,7 @@ if (use_cached_results) {
     par <- as.integer(distinct_session$participant[i]) # participant
     ses <- as.integer(distinct_session$list[i]) # session/list
     
-    dat <- d %>% filter(participant == user, list == ses) # subset data
+    dat <- d %>% filter(participant == par, list == ses) # subset data
     
     param_infer[[i]] <- future_map_dfr(1:n_attempts,
                                        ~ recover_parameters(data = dat,

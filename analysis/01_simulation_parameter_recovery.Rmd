@@ -46,9 +46,8 @@ library(grid)
 library(rlang)
 
 
-n_cores = 6
-future::plan("multisession", workers = n_cores) # Set to desired number of cores
-# future::plan("multicore", workers = n_cores) # for mac users
+n_cores = 6 # Set to desired number of cores
+future::plan("multisession", workers = n_cores) 
 
 theme_paper <- theme_classic(base_size = 14) + 
   theme(axis.text = element_text(colour = "black"))
